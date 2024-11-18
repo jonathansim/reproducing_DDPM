@@ -1,0 +1,42 @@
+import torchvision
+from torch.utils.data import DataLoader
+from torchvision.datasets import MNIST, CIFAR10
+
+
+def get_dataloader(dataset = "MNIST", batch_size = 128):
+    transforms = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.ToTensor(),
+                # No flips in MNIST as it disturbes the interpretation of numbers?
+                #torchvision.transforms.Resize((32, 32), interpolation=torchvision.transforms.InterpolationMode.BICUBIC), # TODO: Resize to 32 x 32 for unet implementation?
+                torchvision.transforms.Normalize((0.5,), (0.5,))  # Correpsonds to scaling between [-1, 1] --> (x - 0.5)/0.5
+            ]
+        )
+    
+    transforms_cifar10_train = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.RandomHorizontalFlip(),
+                #torchvision.transforms.Resize((32, 32), interpolation=torchvision.transforms.InterpolationMode.BICUBIC), # TODO: Match paper or resize to 28 x 28 for unet implementation
+                torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Scaling between [-1, 1]
+            ]
+        )
+    
+    transforms_cifar10_test = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.ToTensor(),
+                #torchvision.transforms.Resize((32, 32), interpolation=torchvision.transforms.InterpolationMode.BICUBIC), # TODO: Match paper or resize to 28 x 28 for unet implementation
+                torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Scaling between [-1, 1]
+            ]
+        )
+    if dataset == "MNIST":
+        trainset = MNIST("./temp/", train=True, download=True, transform= transforms)
+        testset = MNIST("./temp/", train=False, download=True, transform= transforms)
+    elif dataset == "CIFAR10":
+        trainset = CIFAR10("./temp/", train=True, download=True, transform= transforms_cifar10_train)
+        testset = CIFAR10("./temp/", train=False, download=True, transform= transforms_cifar10_test)
+
+
+    train_dataloader = DataLoader(trainset, batch_size=batch_size, num_workers=0, shuffle=True)
+    test_dataloader = DataLoader(testset, batch_size=batch_size, num_workers=0, shuffle=True)
+    return train_dataloader, test_dataloader
