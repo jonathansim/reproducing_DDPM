@@ -3,3 +3,4 @@ data
 temp
 test.ipynb
 js_sandbox.ipynb
+__pycache__/
