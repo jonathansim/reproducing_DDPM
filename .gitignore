@@ -4,3 +4,5 @@ temp
 test.ipynb
 js_sandbox.ipynb
 __pycache__/
+saved_models/
+wandb/

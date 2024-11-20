@@ -72,9 +72,9 @@ class DownBlock(nn.Module):
         x = self.gnorm(x)
         x = self.activation(x)
         skip = x  # Save for skip connection
-        print(f"Right before DS: x shape: {x.shape}, skip shape: {skip.shape}")
+        #print(f"Right before DS: x shape: {x.shape}, skip shape: {skip.shape}")
         x = self.downsample(x)
-        print(f"After DS: x shape: {x.shape}, skip shape: {skip.shape}")
+        #print(f"After DS: x shape: {x.shape}, skip shape: {skip.shape}")
         return x, skip
 
 # Block for bottleneck part of U-net
@@ -87,11 +87,11 @@ class BottleneckBlock(nn.Module):
         self.time_proj = nn.Linear(time_emb_dims, channels)
 
     def forward(self, x, time_emb):
-        print(f"Before bottleneck: x shape: {x.shape}")
+        #print(f"Before bottleneck: x shape: {x.shape}")
         time_emb_proj = self.time_proj(time_emb).unsqueeze(-1).unsqueeze(-1)
         x = self.conv(x) + time_emb_proj
         x = self.norm(x)
-        print(f"After bottleneck: x shape: {x.shape}")
+        #print(f"After bottleneck: x shape: {x.shape}")
         return self.activation(x) 
 
 
@@ -107,23 +107,23 @@ class UpBlock(nn.Module):
 
     def forward(self, x, skip, time_emb):
         # Upsample
-        print(f"Before US: x shape: {x.shape}, skip shape: {skip.shape}")
+        #print(f"Before US: x shape: {x.shape}, skip shape: {skip.shape}")
 
         x = self.upsample(x)
-        print(f"executed")
-        print(f"After US: x shape: {x.shape}, skip shape: {skip.shape}")
+        #print(f"executed")
+        #print(f"After US: x shape: {x.shape}, skip shape: {skip.shape}")
 
         # Resize if spatial dimensions mismatch
         if x.shape[-2:] != skip.shape[-2:]:
             x = F.interpolate(x, size=skip.shape[-2:], mode='nearest')
-            print("Activated interpolation")
+            #print("Activated interpolation")
         
-        print(f"After interpolation: x shape: {x.shape}, skip shape: {skip.shape}")
+        #print(f"After interpolation: x shape: {x.shape}, skip shape: {skip.shape}")
         # Add skip connection
         x = torch.cat([x, skip], dim=1)
         
         # 3. Reduce concatenated channels
-        print(f"Before conv: x shape: {x.shape}")
+        #print(f"Before conv: x shape: {x.shape}")
         x = self.conv(x)
 
         # Add timestep embedding
@@ -201,7 +201,7 @@ class UNet(nn.Module):
             x, skip = block(x, time_emb)
             skips.append(skip)
         
-        print(f"Skips: {len(skips)}")
+        #print(f"Skips: {len(skips)}")
         # Bottleneck block
         x = self.bottleneck(x, time_emb)
 

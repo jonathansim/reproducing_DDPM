@@ -38,7 +38,7 @@ def test_reverse_diffusion(make_plots=True):
     t = torch.randint(1, T, (num_samples,), device=device, dtype=torch.long)  # Random timesteps for the batch
     
     ## Edge case: Test for t=1
-    t = torch.full((num_samples,), 1, device=device, dtype=torch.long)
+    # t = torch.full((num_samples,), device=device, dtype=torch.long)
 
     print(f"Testing reverse diffusion for timesteps: {t}")
 

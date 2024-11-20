@@ -56,10 +56,10 @@ class Diffusion:
         sqrt_alpha_bar_t = self.alpha_bar[t].sqrt().view(-1, 1, 1, 1)
         sqrt_one_minus_alpha_bar_t = (1 - self.alpha_bar[t]).sqrt().view(-1, 1, 1, 1)
         
-        print(f"alpha shape{self.alpha_bar[t].shape}")
-        print(sqrt_alpha_bar_t.shape)
-        print(sqrt_one_minus_alpha_bar_t.shape)
-        print(x0.shape)
+        # print(f"alpha shape{self.alpha_bar[t].shape}")
+        # print(sqrt_alpha_bar_t.shape)
+        # print(sqrt_one_minus_alpha_bar_t.shape)
+        # print(x0.shape)
 
         xt = sqrt_alpha_bar_t * x0 + sqrt_one_minus_alpha_bar_t * eps
  

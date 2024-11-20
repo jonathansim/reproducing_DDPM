@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import torch.nn.functional as F
+import wandb
 
 
 def train_ddpm_epoch(model: object, diffusion: object, time_embedding: object, train_loader: object, epoch: int, device: str, optimizer: object):
@@ -49,6 +50,12 @@ def train_ddpm_epoch(model: object, diffusion: object, time_embedding: object, t
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
+        # Log loss
+        wandb.log({"loss": loss.item()})
+
+        if epoch > 1: 
+            wandb.log({"loss after 1st epoch": loss.item()})
 
         if i % 100 == 0:
             print(f"Epoch {epoch}, batch {i}: loss={loss.item()}")

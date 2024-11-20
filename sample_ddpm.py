@@ -9,7 +9,7 @@ import numpy as np
 import torch.nn.functional as F
 
 
-def sample_ddpm(model: object, diffusion: object, time_embedding: object, device: str, num_samples: int = 16, dataset: str = 'mnist'):
+def sample_ddpm(model: object, diffusion: object, time_embedding: object, device: str, num_samples: int = 16, dataset: str = 'MNIST'):
     """
     This function implements Algorithm 2 from the paper, specifically it samples from the U-Net model.
     Args:
@@ -18,7 +18,7 @@ def sample_ddpm(model: object, diffusion: object, time_embedding: object, device
         time_embedding: Time embedding object.
         device: Device to use (e.g., 'cuda' or 'cpu').
         num_samples: Number of samples to generate.
-        dataset: Dataset to use ('mnist' or 'cifar10').
+        dataset: Dataset to use ('MNIST' or 'CIFAR10').
     Returns:
         samples: Generated samples.
     """
@@ -28,9 +28,9 @@ def sample_ddpm(model: object, diffusion: object, time_embedding: object, device
     model.eval()
     with torch.no_grad():
         # 1. Initialize samples from standard gaussian distribution
-        if dataset == 'mnist':
+        if dataset == 'MNIST':
             x = torch.randn((num_samples, 1, 28, 28), device=device)
-        elif dataset == 'cifar10':
+        elif dataset == 'CIFAR10':
             x = torch.randn((num_samples, 3, 32, 32), device=device)
 
         # 2. iterative reverse diffusion 
