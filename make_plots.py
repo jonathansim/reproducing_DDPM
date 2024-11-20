@@ -41,7 +41,7 @@ def visualize_diffusion(diffusion: object, x0: torch.Tensor, timesteps: list):
 # Test the visualization
 if __name__ == "__main__":
     # Data loader
-    train_dataloader, _ = get_dataloader(dataset="MNIST", batch_size=8)
+    train_dataloader, _ = get_dataloader(dataset="MNIST", batch_size=3)
     x0, _ = next(iter(train_dataloader)) # Get a batch of images
 
     # Ensure x0 is in the correct shape and range
@@ -50,6 +50,7 @@ if __name__ == "__main__":
     #     x0 /= 255.0
     # x0 = x0.unsqueeze(1)  # Add channel dimension if missing
 
+    # print(x0.min(), x0.max(), x0.shape)
 
     # Initialize diffusion process
     diffusion = Diffusion(T=1000, beta_min=0.0001, beta_max=0.02, schedule='linear')
