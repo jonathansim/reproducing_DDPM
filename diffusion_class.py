@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class Diffusion: 
-    def __init__(self, T=1000, beta_min=10e-5, beta_max=0.02, schedule='linear'):
+    def __init__(self, T=1000, beta_min=10e-5, beta_max=0.02, schedule='linear', device='cpu'):
         """
         Initialize the diffusion process.
         Args:
@@ -10,11 +10,13 @@ class Diffusion:
             beta_min: Minimum value of beta in the noise schedule.
             beta_max: Maximum value of beta in the noise schedule.
             schedule: Type of noise schedule ('linear', 'cosine', etc.).
+            device: Device to use for computations.
         """
         self.T = T
         self.beta_min = beta_min
         self.beta_max = beta_max
         self.schedule = schedule
+        self.device = device
 
         # Noise schedule parameters
         self.beta = None
@@ -29,9 +31,9 @@ class Diffusion:
         Precompute the noise schedule.
         """
         if self.schedule == 'linear':
-            self.beta = torch.linspace(self.beta_min, self.beta_max, self.T)
-            self.alpha = 1 - self.beta
-            self.alpha_bar = self.alpha.cumprod(dim=0)
+            self.beta = torch.linspace(self.beta_min, self.beta_max, self.T).to(self.device)
+            self.alpha = (1 - self.beta).to(self.device)
+            self.alpha_bar = self.alpha.cumprod(dim=0).to(self.device)
 
         elif self.schedule == 'cosine':
             raise NotImplementedError("Cosine schedule is not implemented yet.")
@@ -63,19 +65,25 @@ class Diffusion:
  
         return xt, eps 
     
-    def reverse_diffusion(self, xt, t, model):
+    def reverse_diffusion(self, xt, t, model, time_embedding):
         """
         Perform the reverse diffusion process.
         Args:
             xt: Noisy data at timestep t.
             t: Timesteps for batch (tensor of integers).
             model: Model used for reverse diffusion.
+            time_embedding: Time embedding object.
         Returns:
             xr: Reconstructed data at timestep t.
         """
-        z = torch.randn_like(xt) if t > 1 else torch.zeros_like(xt)
+        # z = torch.randn_like(xt) if t > 1 else torch.zeros_like(xt)
+        z = torch.where((t > 1).view(-1, 1, 1, 1), torch.randn_like(xt), torch.zeros_like(xt)) 
         
-        eps_theta = model(xt, t)
+        # extract time embedding
+        time_emb = time_embedding(t)
+
+        # predict noise
+        eps_theta = model(xt, time_emb)
 
         sqrt_alpha_t = self.alpha[t].sqrt().view(-1, 1, 1, 1)  # we need to reshape the tensor to match the shape of xt (same goes for the other tensors)
         beta_t = self.beta[t].view(-1, 1, 1, 1)
