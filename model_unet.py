@@ -57,21 +57,22 @@ class SelfAttentionBlock(nn.Module):
 class DownBlock(nn.Module):
     def __init__(self, in_channels, out_channels, time_emb_dims):
         super().__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
-        self.gnorm = nn.GroupNorm(8, out_channels)
+        self.conv = nn.Conv2d(in_channels, out_channels//2, kernel_size=3, padding=1)
+        self.gnorm = nn.GroupNorm(8, out_channels//2)
         self.activation = nn.SiLU()
-        self.downsample = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=2, padding=1)
-        self.time_proj = nn.Linear(time_emb_dims, out_channels)
+        self.downsample = nn.Conv2d(out_channels//2, out_channels, kernel_size=3, stride=2, padding=1)
+        self.time_proj = nn.Linear(time_emb_dims, out_channels//2)
 
     def forward(self, x, time_emb):
         # Add timestep embedding
         time_emb_proj = self.time_proj(time_emb).unsqueeze(-1).unsqueeze(-1)
-        print(f"Before adding time: x shape: {x.shape}, time_emb shape: {time_emb_proj.shape}")
+        # print(f"Before adding time: x shape: {x.shape}, time_emb shape: {time_emb_proj.shape}")
+        # print(f"The input to the downsample block is: {x.shape}")
         x = self.conv(x) + time_emb_proj
         x = self.gnorm(x)
         x = self.activation(x)
         skip = x  # Save for skip connection
-        #print(f"Before DS: x shape: {x.shape}, skip shape: {skip.shape}")
+        print(f"Right before DS: x shape: {x.shape}, skip shape: {skip.shape}")
         x = self.downsample(x)
         print(f"After DS: x shape: {x.shape}, skip shape: {skip.shape}")
         return x, skip
@@ -101,24 +102,28 @@ class UpBlock(nn.Module):
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
         self.norm = nn.GroupNorm(8, out_channels)
         self.activation = nn.SiLU()
-        self.upsample = nn.ConvTranspose2d(out_channels, out_channels, kernel_size=4, stride=2, padding=1)
+        self.upsample = nn.ConvTranspose2d(out_channels*2, out_channels, kernel_size=4, stride=2, padding=1)
         self.time_proj = nn.Linear(time_emb_dims, out_channels)
 
     def forward(self, x, skip, time_emb):
         # Upsample
-        print(f"US: x shape: {x.shape}, skip shape: {skip.shape}")
+        print(f"Before US: x shape: {x.shape}, skip shape: {skip.shape}")
+
         x = self.upsample(x)
         print(f"executed")
+        print(f"After US: x shape: {x.shape}, skip shape: {skip.shape}")
 
         # Resize if spatial dimensions mismatch
         if x.shape[-2:] != skip.shape[-2:]:
             x = F.interpolate(x, size=skip.shape[-2:], mode='nearest')
             print("Activated interpolation")
         
+        print(f"After interpolation: x shape: {x.shape}, skip shape: {skip.shape}")
         # Add skip connection
         x = torch.cat([x, skip], dim=1)
         
         # 3. Reduce concatenated channels
+        print(f"Before conv: x shape: {x.shape}")
         x = self.conv(x)
 
         # Add timestep embedding
@@ -154,7 +159,7 @@ class UNet(nn.Module):
         self.down_blocks = nn.ModuleList([
             DownBlock(
                 in_channels=resolutions[i],
-                out_channels=resolutions[i + 1],
+                out_channels=resolutions[i+1],
                 time_emb_dims=time_emb_dims
             )
             for i in range(len(resolutions) - 1)
@@ -167,7 +172,7 @@ class UNet(nn.Module):
         # Upsampling blocks
         self.up_blocks = nn.ModuleList([
             UpBlock(
-                in_channels=resolutions[i + 1] + resolutions[i],
+                in_channels=resolutions[i + 1],
                 out_channels=resolutions[i],
                 time_emb_dims=time_emb_dims
             )
@@ -196,6 +201,7 @@ class UNet(nn.Module):
             x, skip = block(x, time_emb)
             skips.append(skip)
         
+        print(f"Skips: {len(skips)}")
         # Bottleneck block
         x = self.bottleneck(x, time_emb)
 
