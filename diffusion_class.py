@@ -74,9 +74,19 @@ class Diffusion:
             xr: Reconstructed data at timestep t.
         """
         z = torch.randn_like(xt) if t > 1 else torch.zeros_like(xt)
+        
+        eps_theta = model(xt, t)
 
-        # one_over_sqrt_alpha_t = 
-        pass 
+        sqrt_alpha_t = self.alpha[t].sqrt().view(-1, 1, 1, 1)  # we need to reshape the tensor to match the shape of xt (same goes for the other tensors)
+        beta_t = self.beta[t].view(-1, 1, 1, 1)
+        sqrt_one_minus_alpha_bar_t = (1 - self.alpha_bar[t]).sqrt().view(-1, 1, 1, 1) 
+        sigma_t = beta_t.sqrt() 
+
+        xt_minus_one = 1. / sqrt_alpha_t * (xt - (beta_t / sqrt_one_minus_alpha_bar_t) * eps_theta) + sigma_t * z
+
+        return xt_minus_one 
+
+        
   
 
 
