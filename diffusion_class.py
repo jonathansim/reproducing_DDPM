@@ -53,7 +53,8 @@ class Diffusion:
 
         sqrt_alpha_bar_t = self.alpha_bar[t].sqrt().view(-1, 1, 1, 1)
         sqrt_one_minus_alpha_bar_t = (1 - self.alpha_bar[t]).sqrt().view(-1, 1, 1, 1)
-
+        
+        print(f"alpha shape{self.alpha_bar[t].shape}")
         print(sqrt_alpha_bar_t.shape)
         print(sqrt_one_minus_alpha_bar_t.shape)
         print(x0.shape)
@@ -63,7 +64,20 @@ class Diffusion:
         return xt, eps 
     
     def reverse_diffusion(self, xt, t, model):
+        """
+        Perform the reverse diffusion process.
+        Args:
+            xt: Noisy data at timestep t.
+            t: Timesteps for batch (tensor of integers).
+            model: Model used for reverse diffusion.
+        Returns:
+            xr: Reconstructed data at timestep t.
+        """
+        z = torch.randn_like(xt) if t > 1 else torch.zeros_like(xt)
+
+        # one_over_sqrt_alpha_t = 
         pass 
+  
 
 
 
