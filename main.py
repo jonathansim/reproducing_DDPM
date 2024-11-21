@@ -28,7 +28,7 @@ def main():
 
     T = 1000  # Total timesteps
     batch_size = 64  # Batch size
-    num_epochs = 30  # Number of epochs
+    num_epochs = 5  # Number of epochs
     lr = 2e-4  # Learning rate
     dataset = "MNIST"  # Dataset to use ('mnist' or 'cifar10')
     save_model = True  # Save model after training
@@ -49,6 +49,9 @@ def main():
     model = UNet(input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
+    for name, param in time_embedding.named_parameters():
+        print(f"{name}: requires_grad={param.requires_grad}")
+
     # Training loop
     for epoch in range(1, num_epochs + 1):
         train_ddpm_epoch(model, diffusion, time_embedding, train_loader, epoch, device, optimizer)
@@ -60,8 +63,12 @@ def main():
 
     if save_model:
         final_save_path = f"{save_dir}/ddpm_{dataset}_final.pth"
-        torch.save(model.state_dict(), final_save_path)
-        print(f"Model saved at: {final_save_path}")
+        torch.save({
+            'model_state_dict': model.state_dict(),
+            "embedding_state_dict": time_embedding.state_dict(),
+        }, final_save_path)
+
+        print(f"Model and embedding saved at: {final_save_path}")
 
     # Finish Weights and Biases run
     wandb.finish()

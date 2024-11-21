@@ -7,6 +7,12 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+
+# Import custom modules
+from model_unet import UNet, SinusoidalPositionEmbeddings
+from diffusion_class import Diffusion
+
 
 
 def sample_ddpm(model: object, diffusion: object, time_embedding: object, device: str, num_samples: int = 16, dataset: str = 'MNIST'):
@@ -43,4 +49,48 @@ def sample_ddpm(model: object, diffusion: object, time_embedding: object, device
         
         # 3. Return samples
         return x
+
+def visualize_samples(samples): 
+    """
+    Visualize the generated samples.
+    Args:
+        samples: Generated samples.
+    """
+    num_samples = samples.size(0)
+    fig, axs = plt.subplots(1, num_samples, figsize=(20, 20))
+
+    for i in range(num_samples):
+        sample = samples[i].cpu().numpy().squeeze()
+        axs[i].imshow(sample, cmap='gray')
+        axs[i].axis('off')
+
+    plt.show()
+
+
+if __name__ == "__main__":
+    # Test the sampling procedure#
+
+    # Set device 
+    device = torch.device("cuda" if torch.cuda.is_available() else 
+                      "mps" if torch.backends.mps.is_available() else 
+                      "cpu")
+    print(f"Using Device: {device}")
+
+    # Step 1: Initialize the Sinusoidal Embeddings
+    time_embedding = SinusoidalPositionEmbeddings(total_time_steps=1000, time_emb_dims=128, time_emb_dims_exp=512).to(device)
+    
+    # Step 2: Initialize the U-Net and Diffusion
+    unet = UNet(input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512).to(device)
+    diffusion = Diffusion(T=1000, beta_min=10e-5, beta_max=0.02, schedule='linear', device=device)
+    
+    # Step 3: Load the trained model
+    model_path = "./saved_models/ddpm_MNIST_final.pth"
+    saved = torch.load(model_path, map_location=device)
+
+    unet.load_state_dict(saved["model_state_dict"])
+    time_embedding.load_state_dict(saved["embedding_state_dict"])
+
+    # Step 4: Generate samples
+    samples = sample_ddpm(unet, diffusion, time_embedding, device, num_samples=15, dataset='MNIST')
+    visualize_samples(samples)
     

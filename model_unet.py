@@ -49,7 +49,7 @@ class SinusoidalPositionEmbeddings(nn.Module):
 # Block for self attention mechanism
 class SelfAttentionBlock(nn.Module):
     # TODO - implement self attention mechanism
-
+    
     pass 
 
 
