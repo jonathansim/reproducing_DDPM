@@ -47,19 +47,24 @@ class SinusoidalPositionEmbeddings(nn.Module):
 
 ### SUBMODULES ### 
 # Block for self attention mechanism
-class SelfAttentionBlock(nn.Module):
-    # TODO - implement self attention mechanism
+# class SelfAttentionBlock(nn.Module):
+#     # TODO - implement self attention mechanism
+#     def __init__(self, )
     
-    pass 
+
+
+#     def forward(self, x, time_emb):
+
 
 
 # Block for downsampling part of U-net
 class DownBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, time_emb_dims):
+    def __init__(self, in_channels, out_channels, time_emb_dims, dropout=0.1):
         super().__init__()
         self.conv = nn.Conv2d(in_channels, out_channels//2, kernel_size=3, padding=1)
         self.gnorm = nn.GroupNorm(8, out_channels//2)
         self.activation = nn.SiLU()
+        self.dropout = nn.Dropout2d(p=dropout)
         self.downsample = nn.Conv2d(out_channels//2, out_channels, kernel_size=3, stride=2, padding=1)
         self.time_proj = nn.Linear(time_emb_dims, out_channels//2)
 
@@ -71,6 +76,7 @@ class DownBlock(nn.Module):
         x = self.conv(x) + time_emb_proj
         x = self.gnorm(x)
         x = self.activation(x)
+        x = self.dropout(x)
         skip = x  # Save for skip connection
         #print(f"Right before DS: x shape: {x.shape}, skip shape: {skip.shape}")
         x = self.downsample(x)
@@ -79,11 +85,12 @@ class DownBlock(nn.Module):
 
 # Block for bottleneck part of U-net
 class BottleneckBlock(nn.Module):
-    def __init__(self, channels, time_emb_dims):
+    def __init__(self, channels, time_emb_dims, dropout=0.1):
         super().__init__()
         self.conv = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
         self.norm = nn.GroupNorm(8, channels)
         self.activation = nn.SiLU()
+        self.dropout = nn.Dropout2d(p=dropout)
         self.time_proj = nn.Linear(time_emb_dims, channels)
 
     def forward(self, x, time_emb):
@@ -91,19 +98,21 @@ class BottleneckBlock(nn.Module):
         time_emb_proj = self.time_proj(time_emb).unsqueeze(-1).unsqueeze(-1)
         x = self.conv(x) + time_emb_proj
         x = self.norm(x)
-        #print(f"After bottleneck: x shape: {x.shape}")
-        return self.activation(x) 
+        x = self.activation(x)
+        x = self.dropout(x)
+        return x
 
 
 # Block for upsampling part of U-net
 class UpBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, time_emb_dims):
+    def __init__(self, in_channels, out_channels, time_emb_dims, dropout=0.1):
         super().__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
         self.norm = nn.GroupNorm(8, out_channels)
         self.activation = nn.SiLU()
         self.upsample = nn.ConvTranspose2d(out_channels*2, out_channels, kernel_size=4, stride=2, padding=1)
         self.time_proj = nn.Linear(time_emb_dims, out_channels)
+        self.dropout = nn.Dropout2d(p=dropout)
 
     def forward(self, x, skip, time_emb):
         # Upsample
@@ -131,6 +140,7 @@ class UpBlock(nn.Module):
         x = x + time_emb_proj
         x = self.norm(x)
         x = self.activation(x)
+        x = self.dropout(x)
         return x
 
 
@@ -138,7 +148,7 @@ class UpBlock(nn.Module):
 ### U-NET MODEL ###
 
 class UNet(nn.Module):
-    def __init__(self, input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512):
+    def __init__(self, input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1):
         """
         U-Net implementation for DDPM
         Args:
@@ -160,21 +170,23 @@ class UNet(nn.Module):
             DownBlock(
                 in_channels=resolutions[i],
                 out_channels=resolutions[i+1],
-                time_emb_dims=time_emb_dims
+                time_emb_dims=time_emb_dims,
+                dropout=dropout
             )
             for i in range(len(resolutions) - 1)
         ])
 
 
         # Bottleneck block
-        self.bottleneck = BottleneckBlock(channels=resolutions[-1], time_emb_dims=time_emb_dims)
+        self.bottleneck = BottleneckBlock(channels=resolutions[-1], time_emb_dims=time_emb_dims, dropout=dropout)
 
         # Upsampling blocks
         self.up_blocks = nn.ModuleList([
             UpBlock(
                 in_channels=resolutions[i + 1],
                 out_channels=resolutions[i],
-                time_emb_dims=time_emb_dims
+                time_emb_dims=time_emb_dims,
+                dropout=dropout
             )
             for i in reversed(range(len(resolutions) - 1))
         ])
@@ -222,7 +234,7 @@ if __name__ == "__main__":
     time_embedding = SinusoidalPositionEmbeddings(total_time_steps=1000, time_emb_dims=128, time_emb_dims_exp=512)
     
     # Step 2: Initialize the U-Net
-    unet = UNet(input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512)
+    unet = UNet(input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1)
     
     # Step 3: Create dummy inputs
     batch_size = 8

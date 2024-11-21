@@ -80,7 +80,7 @@ if __name__ == "__main__":
     time_embedding = SinusoidalPositionEmbeddings(total_time_steps=1000, time_emb_dims=128, time_emb_dims_exp=512).to(device)
     
     # Step 2: Initialize the U-Net and Diffusion
-    unet = UNet(input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512).to(device)
+    unet = UNet(input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1).to(device)
     diffusion = Diffusion(T=1000, beta_min=10e-5, beta_max=0.02, schedule='linear', device=device)
     
     # Step 3: Load the trained model
@@ -90,7 +90,14 @@ if __name__ == "__main__":
     unet.load_state_dict(saved["model_state_dict"])
     time_embedding.load_state_dict(saved["embedding_state_dict"])
 
+    # Number of params (TEST)
+    total_params = sum(p.numel() for p in unet.parameters())
+    trainable_params = sum(p.numel() for p in unet.parameters() if p.requires_grad)
+
+    print(f"Total parameters: {total_params}")
+    print(f"Trainable parameters: {trainable_params}")
+
     # Step 4: Generate samples
-    samples = sample_ddpm(unet, diffusion, time_embedding, device, num_samples=15, dataset='MNIST')
+    samples = sample_ddpm(unet, diffusion, time_embedding, device, num_samples=5, dataset='MNIST')
     visualize_samples(samples)
     
