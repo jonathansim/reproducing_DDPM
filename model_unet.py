@@ -47,19 +47,35 @@ class SinusoidalPositionEmbeddings(nn.Module):
 
 ### SUBMODULES ### 
 # Block for self attention mechanism
-# class SelfAttentionBlock(nn.Module):
-#     # TODO - implement self attention mechanism
-#     def __init__(self, )
-    
+class SelfAttentionBlock(nn.Module):
+    def __init__(self, dim, heads=8, dropout=0.0):
+        super().__init__()
+        self.norm = nn.LayerNorm(dim//2)
+        self.mhsa = nn.MultiheadAttention(embed_dim=dim, num_heads=heads, dropout=dropout, batch_first=True)
 
+    def forward(self, x):
+        B, C, H, W = x.shape
 
-#     def forward(self, x, time_emb):
+        # Reshape for multihead attention
+        x_flat = x.view(B, C, -1).transpose(1, 2) # shape (B, H*W, C)
+
+        # normalize and apply multihead attention
+        x_norm = self.norm(x_flat)
+        attention_out = self.mhsa(x_norm, x_norm, x_norm)[0]
+
+        # Add residual connection
+        x = x_flat + attention_out # we do this to ensure that no information from the input is lost (no matter how the attention might have changed the input)
+
+        # Reshape back to original shape
+        x = x.transpose(1, 2).view(B, C, H, W)
+
+        return x
 
 
 
 # Block for downsampling part of U-net
 class DownBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, time_emb_dims, dropout=0.1):
+    def __init__(self, in_channels, out_channels, time_emb_dims, dropout=0.1, use_attention=False):
         super().__init__()
         self.conv = nn.Conv2d(in_channels, out_channels//2, kernel_size=3, padding=1)
         self.gnorm = nn.GroupNorm(8, out_channels//2)
@@ -67,6 +83,10 @@ class DownBlock(nn.Module):
         self.dropout = nn.Dropout2d(p=dropout)
         self.downsample = nn.Conv2d(out_channels//2, out_channels, kernel_size=3, stride=2, padding=1)
         self.time_proj = nn.Linear(time_emb_dims, out_channels//2)
+        if use_attention:
+            self.attention = SelfAttentionBlock(dim=out_channels, heads=8)
+        else:
+            self.attention = nn.Identity()
 
     def forward(self, x, time_emb):
         # Add timestep embedding
@@ -77,10 +97,12 @@ class DownBlock(nn.Module):
         x = self.gnorm(x)
         x = self.activation(x)
         x = self.dropout(x)
-        skip = x  # Save for skip connection
-        #print(f"Right before DS: x shape: {x.shape}, skip shape: {skip.shape}")
+
+        # Apply self-attention
+        x = self.attention(x)
+
+        skip = x  # Save for skip connection   
         x = self.downsample(x)
-        #print(f"After DS: x shape: {x.shape}, skip shape: {skip.shape}")
         return x, skip
 
 # Block for bottleneck part of U-net
@@ -105,7 +127,7 @@ class BottleneckBlock(nn.Module):
 
 # Block for upsampling part of U-net
 class UpBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, time_emb_dims, dropout=0.1):
+    def __init__(self, in_channels, out_channels, time_emb_dims, dropout=0.1, use_attention=False):
         super().__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
         self.norm = nn.GroupNorm(8, out_channels)
@@ -113,6 +135,11 @@ class UpBlock(nn.Module):
         self.upsample = nn.ConvTranspose2d(out_channels*2, out_channels, kernel_size=4, stride=2, padding=1)
         self.time_proj = nn.Linear(time_emb_dims, out_channels)
         self.dropout = nn.Dropout2d(p=dropout)
+        
+        if use_attention:
+            self.attention = SelfAttentionBlock(dim=out_channels, heads=8)
+        else:
+            self.attention = nn.Identity()
 
     def forward(self, x, skip, time_emb):
         # Upsample
@@ -141,6 +168,10 @@ class UpBlock(nn.Module):
         x = self.norm(x)
         x = self.activation(x)
         x = self.dropout(x)
+
+        # Apply self-attention
+        x = self.attention(x)
+
         return x
 
 
@@ -148,7 +179,7 @@ class UpBlock(nn.Module):
 ### U-NET MODEL ###
 
 class UNet(nn.Module):
-    def __init__(self, input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1):
+    def __init__(self, input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1, use_attention=[False, False, False]):
         """
         U-Net implementation for DDPM
         Args:
@@ -171,7 +202,8 @@ class UNet(nn.Module):
                 in_channels=resolutions[i],
                 out_channels=resolutions[i+1],
                 time_emb_dims=time_emb_dims,
-                dropout=dropout
+                dropout=dropout, 
+                use_attention=use_attention[i]
             )
             for i in range(len(resolutions) - 1)
         ])
@@ -186,7 +218,8 @@ class UNet(nn.Module):
                 in_channels=resolutions[i + 1],
                 out_channels=resolutions[i],
                 time_emb_dims=time_emb_dims,
-                dropout=dropout
+                dropout=dropout, 
+                use_attention=use_attention[i]
             )
             for i in reversed(range(len(resolutions) - 1))
         ])
