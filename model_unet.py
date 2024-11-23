@@ -48,10 +48,21 @@ class SinusoidalPositionEmbeddings(nn.Module):
 ### SUBMODULES ### 
 # Block for self attention mechanism
 class SelfAttentionBlock(nn.Module):
-    def __init__(self, dim, heads=8, dropout=0.0):
+    def __init__(self, dim, heads=8, dropout=0.0, dim_scale = 0.5):
+        '''
+        Attention Block with flexible dimension adjustment.
+        
+        Args:
+            dim: Number of input channels.
+            num_heads: Number of attention heads.
+            dim_scale: Scale factor for input dimensions.
+                        - Use dim_scale=0.5 for downblock.
+                        - Use dim_scale=1 for upblock.
+        '''
         super().__init__()
-        self.norm = nn.LayerNorm(dim//2)
-        self.mhsa = nn.MultiheadAttention(embed_dim=dim, num_heads=heads, dropout=dropout, batch_first=True)
+        self.scaled_dim = int(dim * dim_scale)
+        self.norm = nn.LayerNorm(self.scaled_dim)
+        self.mhsa = nn.MultiheadAttention(self.scaled_dim, num_heads=heads, dropout=dropout, batch_first=True)
 
     def forward(self, x):
         B, C, H, W = x.shape
@@ -84,7 +95,7 @@ class DownBlock(nn.Module):
         self.downsample = nn.Conv2d(out_channels//2, out_channels, kernel_size=3, stride=2, padding=1)
         self.time_proj = nn.Linear(time_emb_dims, out_channels//2)
         if use_attention:
-            self.attention = SelfAttentionBlock(dim=out_channels, heads=8)
+            self.attention = SelfAttentionBlock(dim=out_channels, heads=8, dim_scale=0.5)
         else:
             self.attention = nn.Identity()
 
@@ -122,6 +133,7 @@ class BottleneckBlock(nn.Module):
         x = self.norm(x)
         x = self.activation(x)
         x = self.dropout(x)
+
         return x
 
 
@@ -137,7 +149,7 @@ class UpBlock(nn.Module):
         self.dropout = nn.Dropout2d(p=dropout)
         
         if use_attention:
-            self.attention = SelfAttentionBlock(dim=out_channels, heads=8)
+            self.attention = SelfAttentionBlock(dim=out_channels, heads=8, dim_scale=1)
         else:
             self.attention = nn.Identity()
 
@@ -179,7 +191,7 @@ class UpBlock(nn.Module):
 ### U-NET MODEL ###
 
 class UNet(nn.Module):
-    def __init__(self, input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1, use_attention=[False, False, False]):
+    def __init__(self, input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1, use_attention=[False, True, False]):
         """
         U-Net implementation for DDPM
         Args:
