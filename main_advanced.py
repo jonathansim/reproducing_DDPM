@@ -13,7 +13,7 @@ import argparse
 import wandb 
 
 # Import custom modules
-from model_unet import UNet, SinusoidalPositionEmbeddings
+from model_unet_advanced import UNet, SinusoidalPositionEmbeddings
 from diffusion_class import Diffusion
 from train_ddpm import train_ddpm_epoch
 from sample_ddpm import sample_ddpm
@@ -82,7 +82,7 @@ def main():
             wandb.log({"Generated Samples": [wandb.Image(sample, caption=f"Epoch {epoch}") for sample in samples]})
 
     if save_model:
-        final_save_path = f"{save_dir}/ddpm_{dataset}_final.pth"
+        final_save_path = f"{save_dir}/ddpm_{dataset}_fina_advanced.pth"
         torch.save({
             'model_state_dict': model.state_dict(),
             "embedding_state_dict": time_embedding.state_dict(),
