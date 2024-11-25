@@ -66,7 +66,7 @@ def main():
     # Initialize components 
     diffusion = Diffusion(T=T, beta_min=10e-5, beta_max=0.02, schedule='linear', device=device) 
     time_embedding = SinusoidalPositionEmbeddings(total_time_steps=T, time_emb_dims=128, time_emb_dims_exp=512).to(device)
-    model = UNet(input_channels=num_input_channels, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1, use_attention=[False, True, False]).to(device)
+    model = UNet(input_channels=num_input_channels, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1, use_attention=[False, True, True]).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     for name, param in time_embedding.named_parameters():
