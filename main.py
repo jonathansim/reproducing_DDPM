@@ -27,7 +27,7 @@ parser.add_argument('--T', type=int, default=1000, help='Total timesteps.')
 parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
 parser.add_argument('--num_epochs', type=int, default=5, help='Number of epochs.')
 parser.add_argument('--lr', type=float, default=2e-4, help='Learning rate.')
-parser.add_argument('--dataset', type=str, default='MNIST', help='Dataset to use (MNIST or CIFAR10).')
+parser.add_argument('--dataset', type=str, default='CIFAR10', help='Dataset to use (MNIST or CIFAR10).')
 parser.add_argument('--save_model', type=bool, default=True, help='Save model after training.')
 parser.add_argument('--wandb', default="online", type=str, choices=["online", "disabled"] , help="whether to track with weights and biases or not")
 
@@ -44,6 +44,9 @@ def main():
     save_model = args.save_model
 
     save_dir = "./saved_models"  # Directory to save the trained model
+
+    # Set number of input channels
+    num_input_channels = 1 if dataset == 'MNIST' else 3
 
     # Set mode for Weights and Biases
     mode_for_wandb = args.wandb
@@ -63,7 +66,7 @@ def main():
     # Initialize components 
     diffusion = Diffusion(T=T, beta_min=10e-5, beta_max=0.02, schedule='linear', device=device) 
     time_embedding = SinusoidalPositionEmbeddings(total_time_steps=T, time_emb_dims=128, time_emb_dims_exp=512).to(device)
-    model = UNet(input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1).to(device)
+    model = UNet(input_channels=num_input_channels, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1, use_attention=[False, True, False]).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     for name, param in time_embedding.named_parameters():
