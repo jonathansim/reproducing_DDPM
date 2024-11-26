@@ -86,41 +86,42 @@ class SelfAttentionBlock(nn.Module):
 
 # Block for downsampling part of U-net
 class DownBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, time_emb_dims, dropout=0.1, use_attention=False):
+    def __init__(self, in_channels, out_channels, time_emb_dims, dropout=0.1, use_attention=False, heads=4):
         super().__init__()
         # First conv
-        self.conv1 = nn.Conv2d(in_channels, out_channels//2, kernel_size=3, padding=1)
-        self.norm1 = nn.GroupNorm(8, out_channels//2)
+        self.norm1 = nn.GroupNorm(8, in_channels)
         self.activation1 = nn.SiLU()
-
+        self.conv1 = nn.Conv2d(in_channels, out_channels//2, kernel_size=3, padding=1)
+ 
         # Second conv 
-        self.conv2 = nn.Conv2d(out_channels//2, out_channels//2, kernel_size=3, padding=1)
         self.norm2 = nn.GroupNorm(8, out_channels//2)
         self.activation2 = nn.SiLU()
+        self.conv2 = nn.Conv2d(out_channels//2, out_channels//2, kernel_size=3, padding=1)
 
+        # Dropout, downsample, timestep embedding, and self-attention
         self.dropout = nn.Dropout2d(p=dropout)
         self.downsample = nn.Conv2d(out_channels//2, out_channels, kernel_size=3, stride=2, padding=1)
         self.time_proj = nn.Linear(time_emb_dims, out_channels//2)
         if use_attention:
-            self.attention = SelfAttentionBlock(dim=out_channels, heads=8, dim_scale=0.5)
+            self.attention = SelfAttentionBlock(dim=out_channels, heads=heads, dim_scale=0.5)
         else:
             self.attention = nn.Identity()
 
     def forward(self, x, time_emb):
-        # Add timestep embedding
+        # Feed time embedding through linear layer
         time_emb_proj = self.time_proj(time_emb).unsqueeze(-1).unsqueeze(-1)
-        # print(f"Before adding time: x shape: {x.shape}, time_emb shape: {time_emb_proj.shape}")
-        # print(f"The input to the downsample block is: {x.shape}")
-        # Apply first conv
-        x = self.conv1(x) + time_emb_proj
-        x = self.norm1(x)
-        x = self.activation1(x)
-        x = self.dropout(x)
+  
+        # Normalize and apply activation
+        x = self.activation1(self.norm1(x))
+        x = self.conv1(x)
 
-        # Apply second conv
+        # Add timestep embedding
+        x += self.activation1(time_emb_proj)
+
+        # Normalize and apply activation
+        x = self.activation2(self.norm2(x))
+        x = self.dropout(x)
         x = self.conv2(x)
-        x = self.norm2(x)
-        x = self.activation2(x)
 
         # Apply self-attention
         x = self.attention(x)
@@ -134,92 +135,85 @@ class BottleneckBlock(nn.Module):
     def __init__(self, channels, time_emb_dims, dropout=0.1):
         super().__init__()
         # First conv
-        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
         self.norm1 = nn.GroupNorm(8, channels)
         self.activation1 = nn.SiLU()
+        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
         
         # Second conv
-        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
         self.norm2 = nn.GroupNorm(8, channels)
         self.activation2 = nn.SiLU()
+        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
 
         self.dropout = nn.Dropout2d(p=dropout)
         self.time_proj = nn.Linear(time_emb_dims, channels)
 
     def forward(self, x, time_emb):
-        #print(f"Before bottleneck: x shape: {x.shape}")
-        # Apply first conv
-        x = self.conv1(x)
-        x = self.norm1(x)
-        x = self.activation1(x)
-        
+        # Feed time embedding through linear layer
         time_emb_proj = self.time_proj(time_emb).unsqueeze(-1).unsqueeze(-1)
+  
+        # Normalize and apply activation
+        x = self.activation1(self.norm1(x))
+        x = self.conv1(x)
+
         # Add timestep embedding
-        x = x + time_emb_proj
-        
-        # Apply second conv
-        x = self.conv2(x)
-        x = self.norm2(x)
-        x = self.activation2(x)
+        x += self.activation1(time_emb_proj)
+
+        # Normalize and apply activation
+        x = self.activation2(self.norm2(x))
         x = self.dropout(x)
+        x = self.conv2(x)
 
         return x
 
 
 # Block for upsampling part of U-net
 class UpBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, time_emb_dims, dropout=0.1, use_attention=False):
+    def __init__(self, in_channels, out_channels, time_emb_dims, dropout=0.1, use_attention=False, heads=4):
         super().__init__()
         # First conv
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
-        self.norm1 = nn.GroupNorm(8, out_channels)
+        self.norm1 = nn.GroupNorm(8, in_channels)
         self.activation1 = nn.SiLU()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
 
         # Second conv
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
         self.norm2 = nn.GroupNorm(8, out_channels)
         self.activation2 = nn.SiLU()
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
 
         self.upsample = nn.ConvTranspose2d(out_channels*2, out_channels, kernel_size=4, stride=2, padding=1)
         self.time_proj = nn.Linear(time_emb_dims, out_channels)
         self.dropout = nn.Dropout2d(p=dropout)
         
         if use_attention:
-            self.attention = SelfAttentionBlock(dim=out_channels, heads=8, dim_scale=1)
+            self.attention = SelfAttentionBlock(dim=out_channels, heads=heads, dim_scale=1)
         else:
             self.attention = nn.Identity()
 
     def forward(self, x, skip, time_emb):
         # Upsample
-        #print(f"Before US: x shape: {x.shape}, skip shape: {skip.shape}")
-
         x = self.upsample(x)
-        #print(f"executed")
-        #print(f"After US: x shape: {x.shape}, skip shape: {skip.shape}")
+
+        # Feed time embedding through linear layer
+        time_emb_proj = self.time_proj(time_emb).unsqueeze(-1).unsqueeze(-1)
 
         # Resize if spatial dimensions mismatch
         if x.shape[-2:] != skip.shape[-2:]:
             x = F.interpolate(x, size=skip.shape[-2:], mode='nearest')
-            #print("Activated interpolation")
         
-        #print(f"After interpolation: x shape: {x.shape}, skip shape: {skip.shape}")
         # Add skip connection
         x = torch.cat([x, skip], dim=1)
 
-        # Apply first convolution
+        # Normalize and apply activation
+        x = self.activation1(self.norm1(x))
         x = self.conv1(x)
-        x = self.norm1(x)
-        x = self.activation1(x)
 
-        # Apply second convolution (new layer)
-        x = self.conv2(x)
-        x = self.norm2(x)
-        x = self.activation2(x)
-        
         # Add timestep embedding
-        time_emb_proj = self.time_proj(time_emb).unsqueeze(-1).unsqueeze(-1)
-        x = x + time_emb_proj
+        x += self.activation1(time_emb_proj)
+
+        # Normalize and apply activation
+        x = self.activation2(self.norm2(x))
         x = self.dropout(x)
+        x = self.conv2(x)
 
         # Apply self-attention
         x = self.attention(x)
@@ -231,7 +225,7 @@ class UpBlock(nn.Module):
 ### U-NET MODEL ###
 
 class UNet(nn.Module):
-    def __init__(self, input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1, use_attention=[False, True, False]):
+    def __init__(self, input_channels=1, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1, use_attention=[False, True, False], heads=4):
         """
         U-Net implementation for DDPM
         Args:
@@ -255,7 +249,8 @@ class UNet(nn.Module):
                 out_channels=resolutions[i+1],
                 time_emb_dims=time_emb_dims,
                 dropout=dropout, 
-                use_attention=use_attention[i]
+                use_attention=use_attention[i],
+                heads=heads
             )
             for i in range(len(resolutions) - 1)
         ])
@@ -271,7 +266,8 @@ class UNet(nn.Module):
                 out_channels=resolutions[i],
                 time_emb_dims=time_emb_dims,
                 dropout=dropout, 
-                use_attention=use_attention[i]
+                use_attention=use_attention[i],
+                heads=heads
             )
             for i in reversed(range(len(resolutions) - 1))
         ])
