@@ -30,6 +30,7 @@ parser.add_argument('--lr', type=float, default=2e-4, help='Learning rate.')
 parser.add_argument('--dataset', type=str, default='CIFAR10', help='Dataset to use (MNIST or CIFAR10).')
 parser.add_argument('--save_model', type=bool, default=True, help='Save model after training.')
 parser.add_argument('--wandb', default="online", type=str, choices=["online", "disabled"] , help="whether to track with weights and biases or not")
+parser.add_argument('--heads', type=int, default=4, help='Number of heads for attention mechanism.')
 
 def main():
     # Parse arguments
@@ -42,6 +43,7 @@ def main():
     lr = args.lr
     dataset = args.dataset
     save_model = args.save_model
+    heads = args.heads
 
     save_dir = "./saved_models"  # Directory to save the trained model
 
@@ -65,8 +67,16 @@ def main():
 
     # Initialize components 
     diffusion = Diffusion(T=T, beta_min=10e-5, beta_max=0.02, schedule='linear', device=device) 
+
     time_embedding = SinusoidalPositionEmbeddings(total_time_steps=T, time_emb_dims=128, time_emb_dims_exp=512).to(device)
-    model = UNet(input_channels=num_input_channels, resolutions=[64, 128, 256, 512], time_emb_dims=512, dropout=0.1, use_attention=[False, True, False]).to(device)
+
+    model = UNet(input_channels=num_input_channels, 
+                 resolutions=[64, 128, 256, 512], 
+                 time_emb_dims=512, 
+                 dropout=0.1, 
+                 use_attention=[False, True, False], 
+                 heads=heads).to(device)
+    
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     for name, param in time_embedding.named_parameters():
