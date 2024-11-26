@@ -1,5 +1,4 @@
 import numpy as np
-from keras.applications.inception_v3 import InceptionV3
 import tensorflow as tf
 from scipy.linalg import fractional_matrix_power
 import torchvision.models as models
