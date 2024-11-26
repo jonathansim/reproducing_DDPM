@@ -2,20 +2,24 @@ import numpy as np
 from keras.applications.inception_v3 import InceptionV3
 import tensorflow as tf
 from scipy.linalg import fractional_matrix_power
-from torchvision import datasets, transforms
-from torch.utils import data
+import torchvision.models as models
 import torch
 import tensorflow_hub as tfhub
-from dataloader import get_dataloader
+from dataloader import get_dataloader_evaluation
 
 '''
-EXAMPLE:
+EXAMPLE MNIST:
+# Get MNIST prediction model
+MNIST_MODULE = "https://tfhub.dev/tensorflow/tfgan/eval/mnist/logits/1"
+mnist_classifier_fn = tfhub.load(MNIST_MODULE)
 
-dataloader, _ = get_dataloader(dataset = "MNIST", batch_size = 128)
+dataloader = get_dataloader_evaluation(dataset = "MNIST", batch_size = 128)
 mnist_real = get_mnist_real(dataloader, num_images=10000)
 real_activations = compute_mnist_activations(mnist_real, mnist_classifier_fn)
+generated_activations = compute_mnist_activations(samples, mnist_classifier_fn)
 
-calculate_fid(activations[5000:10000], activations[:5000])
+# Calculate FID
+calculate_fid(real_activations, generated_activations)
 
 '''
 
@@ -55,9 +59,6 @@ def compute_activations(tensors, num_batches, classifier_fn):
     )
     return tf.concat(tf.unstack(activation), 0)
 
-# Get MNIST prediction model
-MNIST_MODULE = "https://tfhub.dev/tensorflow/tfgan/eval/mnist/logits/1"
-mnist_classifier_fn = tfhub.load(MNIST_MODULE)
 
 def get_mnist_real(dataloader, num_images=None):
     """
@@ -103,4 +104,105 @@ def compute_mnist_activations(samples, classifier_fn):
 
     return activations.numpy()
 
+def full_fid_mnist(generated_samples, num_images = 10000):
+    """
+    Computes the Fréchet Inception Distance (FID) score between generated samples
+    and real MNIST images using a pre-trained MNIST classifier instead of Inceptionv3.
 
+    Args:
+        generated_samples (torch.Tensor): Tensor containing the generated samples 
+            of shape (num_samples, channels, height, width).
+        num_images (int, optional): Number of real MNIST images to use for FID computation. Should be the same as num_samples. 
+            Defaults to 10,000.
+
+    Returns:
+        float: FID score between the generated and real MNIST images.
+    """
+
+    # Get MNIST prediction model
+    MNIST_MODULE = "https://tfhub.dev/tensorflow/tfgan/eval/mnist/logits/1"
+    mnist_classifier_fn = tfhub.load(MNIST_MODULE)
+
+    dataloader = get_dataloader_evaluation(dataset = "MNIST", batch_size = 128)
+    mnist_real = get_mnist_real(dataloader, num_images=num_images)
+    real_activations = compute_mnist_activations(mnist_real, mnist_classifier_fn)
+    generated_activations = compute_mnist_activations(generated_samples, mnist_classifier_fn)
+
+    # Calculate FID
+    fid = calculate_fid(real_activations, generated_activations)
+
+    return fid
+
+
+def compute_cifar_activations(samples, model):
+    """
+    Compute activations for samples using the CIFAR-10 feature extractor.
+    Args:
+        samples: Tensor of shape (num_samples, channels, height, width)
+        model: Pre-trained model to extract features
+    Returns:
+        activations: Feature activations for input images
+    """
+    model.eval()
+    samples = samples.to(next(model.parameters()).device)  # Move to the same device as the model
+    with torch.no_grad():
+        activations = model(samples)
+    return activations.cpu().numpy()
+
+
+def get_cifar_real_in_batches(dataloader, num_images=None):
+    """
+    Fetch CIFAR-10 images in smaller batches without concatenating them.
+    Args:
+        dataloader: PyTorch DataLoader providing the CIFAR-10 dataset.
+        num_images: Number of images to fetch.
+    Yields:
+        Batches of real images from the CIFAR-10 dataset.
+    """
+    count = 0
+    for images, _ in dataloader:
+        count += len(images)
+        if num_images and count >= num_images:
+            img_need = num_images - count
+            images = images[:img_need]
+            yield images
+            break
+
+        # Yield images batch-by-batch
+        yield images
+
+        # Free memory
+        del images
+        torch.cuda.empty_cache()
+
+
+def full_fid_cifar(generated_samples, num_images = 10000):
+    """
+    Computes the Fréchet Inception Distance (FID) between generated images and real CIFAR-10 images.
+    Args:
+        generated_samples (torch.Tensor): Tensor of generated samples 
+            with shape (num_samples, channels, height, width).
+        num_images (int, optional): Number of real CIFAR-10 images to use for FID computation. 
+            Defaults to 10,000.
+    Returns:
+        float: FID score between the generated and real CIFAR-10 images.
+    """
+
+    # Load pre-trained InceptionV3
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    cifar_classifier = models.inception_v3(weights='DEFAULT', transform_input=False)
+    cifar_classifier.fc = torch.nn.Identity()  # remove classification layer to extract features
+    cifar_classifier = cifar_classifier.to(device)
+    # Get CIFAR-10 train samples
+    dataloader = get_dataloader_evaluation(dataset = "CIFAR10", batch_size = 100)
+    real_image_activations = []
+
+    for batch in get_cifar_real_in_batches(dataloader, num_images=num_images):
+        activation = compute_cifar_activations(batch, cifar_classifier)
+        real_image_activations.extend(activation)
+    
+    generated_image_activations = compute_cifar_activations(generated_samples, cifar_classifier)
+
+    fid = calculate_fid(real_image_activations, generated_image_activations)
+
+    return fid
