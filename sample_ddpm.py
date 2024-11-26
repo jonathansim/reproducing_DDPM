@@ -68,50 +68,6 @@ def visualize_samples_mnist(samples):
 
     plt.show()
 
-# def visualize_samples_cifar10(samples):
-#     """
-#     Visualize the generated samples.
-#     Args:
-#         samples: Generated samples of shape (num_samples, 3, 32, 32).
-#     """
-#     num_samples = samples.size(0)
-#     fig, axs = plt.subplots(1, num_samples, figsize=(num_samples * 2, 2))  # Adjusted size for clarity
-
-#     for i in range(num_samples):
-#         sample = samples[i].permute(1, 2, 0).cpu().numpy()  # Convert (3, 32, 32) -> (32, 32, 3)
-#         axs[i].imshow(sample)
-#         axs[i].axis('off')
-
-#     plt.tight_layout()
-#     plt.show()
-
-
-# def visualize_samples_cifar10(samples, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)): 
-#     """
-#     Visualize the generated samples.
-#     Args:
-#         samples: Generated samples of shape (num_samples, 3, 32, 32).
-#         mean: Tuple of mean values used for normalization (default for CIFAR is (0.5, 0.5, 0.5)).
-#         std: Tuple of std values used for normalization (default for CIFAR is (0.5, 0.5, 0.5)).
-#     """
-#     # Denormalize the images
-#     mean = torch.tensor(mean).view(1, 3, 1, 1).to(samples.device)
-#     std = torch.tensor(std).view(1, 3, 1, 1).to(samples.device)
-#     samples = samples * std + mean  # Denormalize
-
-#     # Clip values to [0, 1] range for display
-#     samples = samples.clamp(0, 1)
-
-#     num_samples = samples.size(0)
-#     fig, axs = plt.subplots(1, num_samples, figsize=(num_samples * 2, 2))
-
-#     for i in range(num_samples):
-#         sample = samples[i].permute(1, 2, 0).cpu().numpy()  # Convert (3, 32, 32) -> (32, 32, 3)
-#         axs[i].imshow(sample)
-#         axs[i].axis('off')
-
-#     plt.tight_layout()
-#     plt.show()
 
 def visualize_samples_cifar10(samples, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5), num_cols=math.ceil(math.sqrt(225))): 
     """
@@ -149,7 +105,6 @@ def visualize_samples_cifar10(samples, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)
 
     plt.tight_layout()
     plt.show()
-
 
 
 if __name__ == "__main__":
