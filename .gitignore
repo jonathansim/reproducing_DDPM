@@ -1,4 +1,6 @@
 env
+ddpm_env
+run.sh
 data
 temp
 test.ipynb
