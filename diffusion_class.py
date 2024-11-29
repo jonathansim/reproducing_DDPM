@@ -36,7 +36,11 @@ class Diffusion:
             self.alpha_bar = self.alpha.cumprod(dim=0).to(self.device)
 
         elif self.schedule == 'cosine':
-            raise NotImplementedError("Cosine schedule is not implemented yet.")
+            s = 0.008  # offset
+            t = torch.linspace(0, self.T, self.T).to(self.device)
+            self.alpha_bar = torch.cos(((t / self.T) + s) / (1 + s) * np.pi/2) ** 2 # Cosine schedule
+            self.alpha_bar = self.alpha_bar/self.alpha_bar[0]
+            self.beta = 1 - self.alpha_bar/(self.alpha_bar -1)
         else:
             raise ValueError(f"Unknown schedule type: {self.schedule}")
         
