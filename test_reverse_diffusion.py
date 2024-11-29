@@ -21,7 +21,7 @@ def test_reverse_diffusion(make_plots=True):
     print(f"Using Device: {device}")
 
     # Initialize diffusion and embedding
-    diffusion = Diffusion(T=T, beta_min=1e-5, beta_max=0.02, schedule='linear', device=device)
+    diffusion = Diffusion(T=T, beta_min=1e-5, beta_max=0.02, schedule='cosine', device=device)
     # diffusion.to(device)
 
     time_embedding = SinusoidalPositionEmbeddings(total_time_steps=T, time_emb_dims=128, time_emb_dims_exp=512).to(device)

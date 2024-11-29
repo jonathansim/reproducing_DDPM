@@ -27,10 +27,11 @@ parser.add_argument('--T', type=int, default=1000, help='Total timesteps.')
 parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
 parser.add_argument('--num_epochs', type=int, default=5, help='Number of epochs.')
 parser.add_argument('--lr', type=float, default=2e-4, help='Learning rate.')
-parser.add_argument('--dataset', type=str, default='CIFAR10', help='Dataset to use (MNIST or CIFAR10).')
+parser.add_argument('--dataset', type=str, default='MNIST', help='Dataset to use (MNIST or CIFAR10).')
 parser.add_argument('--save_model', type=bool, default=True, help='Save model after training.')
 parser.add_argument('--wandb', default="online", type=str, choices=["online", "disabled"] , help="whether to track with weights and biases or not")
 parser.add_argument('--heads', type=int, default=4, help='Number of heads for attention mechanism.')
+parser.add_argument('--noise_scheduler', type=str, default='cosine', choices=["linear", "cosine"], help='Noise scheduler type.')
 
 def main():
     # Parse arguments
@@ -44,6 +45,7 @@ def main():
     dataset = args.dataset
     save_model = args.save_model
     heads = args.heads
+    noise_scheduler = args.noise_scheduler
 
     save_dir = "./saved_models"  # Directory to save the trained model
 
@@ -66,7 +68,7 @@ def main():
     train_loader, _ = get_dataloader(dataset, batch_size=batch_size)
 
     # Initialize components 
-    diffusion = Diffusion(T=T, beta_min=10e-5, beta_max=0.02, schedule='linear', device=device) 
+    diffusion = Diffusion(T=T, beta_min=10e-5, beta_max=0.02, schedule=noise_scheduler, device=device) 
 
     time_embedding = SinusoidalPositionEmbeddings(total_time_steps=T, time_emb_dims=128, time_emb_dims_exp=512).to(device)
 
@@ -92,7 +94,7 @@ def main():
             wandb.log({"Generated Samples": [wandb.Image(sample, caption=f"Epoch {epoch}") for sample in samples]})
 
     if save_model:
-        final_save_path = f"{save_dir}/ddpm_{dataset}_fina_advanced.pth"
+        final_save_path = f"{save_dir}/ddpm_{dataset}_{noise_scheduler}_final.pth"
         torch.save({
             'model_state_dict': model.state_dict(),
             "embedding_state_dict": time_embedding.state_dict(),

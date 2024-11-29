@@ -36,15 +36,19 @@ class Diffusion:
             self.alpha_bar = self.alpha.cumprod(dim=0).to(self.device)
 
         elif self.schedule == 'cosine':
-            s = 0.008  # offset
-            t = torch.linspace(0, self.T, self.T).to(self.device)
-            self.alpha_bar = torch.cos(((t / self.T) + s) / (1 + s) * np.pi/2) ** 2 # Cosine schedule
-            self.alpha_bar = self.alpha_bar/self.alpha_bar[0]
-            self.beta = 1 - self.alpha_bar/(self.alpha_bar -1)
+            steps = torch.linspace(0, torch.pi, self.T).to(self.device)
+            self.beta = ((torch.cos(steps) + 1) * 0.5 * (self.beta_max - self.beta_min) + self.beta_min).flip(0)
+            self.alpha = (1 - self.beta).to(self.device)
+            self.alpha_bar = self.alpha.cumprod(dim=0).to(self.device)
+
+            # s = 0.008  # offset
+            # t = torch.linspace(0, self.T, self.T).to(self.device)
+            # self.alpha_bar = torch.cos(((t / self.T) + s) / (1 + s) * np.pi/2) ** 2 # Cosine schedule
+            # self.alpha_bar = self.alpha_bar/self.alpha_bar[0]
+            # self.beta = 1 - self.alpha_bar/(self.alpha_bar -1)
         else:
             raise ValueError(f"Unknown schedule type: {self.schedule}")
         
-    
     def forward_diffusion(self, x0, t):
         """
         Perform the forward diffusion process.
