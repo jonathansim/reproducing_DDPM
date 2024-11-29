@@ -11,7 +11,7 @@ import torch.nn.functional as F
 import wandb
 
 
-def train_ddpm_epoch(model: object, diffusion: object, time_embedding: object, train_loader: object, epoch: int, device: str, optimizer: object):
+def train_ddpm_epoch(model: object, diffusion: object, time_embedding: object, train_loader: object, epoch: int, device: str, optimizer: object, lr_scheduler: object):
     """
     This function implements Algorithm 1 from the paper, specifically it trains the U-Net model for one epoch.
     Args:
@@ -50,6 +50,10 @@ def train_ddpm_epoch(model: object, diffusion: object, time_embedding: object, t
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
+        # Use learning rate scheduler
+        if lr_scheduler:
+            lr_scheduler.step()
 
         # Log loss
         wandb.log({"loss": loss.item()})

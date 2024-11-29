@@ -18,6 +18,7 @@ from diffusion_class import Diffusion
 from train_ddpm import train_ddpm_epoch
 from sample_ddpm import sample_ddpm
 from dataloader import get_dataloader
+from custom_lr_scheduler import WarmUpPiecewiseConstantSchedule
 
 ## Argument parser
 parser = argparse.ArgumentParser(description='Train (and sample from) DDPM framework.')
@@ -32,6 +33,7 @@ parser.add_argument('--save_model', type=bool, default=True, help='Save model af
 parser.add_argument('--wandb', default="online", type=str, choices=["online", "disabled"] , help="whether to track with weights and biases or not")
 parser.add_argument('--heads', type=int, default=4, help='Number of heads for attention mechanism.')
 parser.add_argument('--noise_scheduler', type=str, default='cosine', choices=["linear", "cosine"], help='Noise scheduler type.')
+parser.add_argument('--lr_scheduler', type=str, default='none', choices=["none", "warmup_linear"], help='Learning rate scheduler type.')
 
 def main():
     # Parse arguments
@@ -46,6 +48,15 @@ def main():
     save_model = args.save_model
     heads = args.heads
     noise_scheduler = args.noise_scheduler
+    lr_scheduler = args.lr_scheduler
+
+    # Scheduler parameters
+    warm_up_epochs = 2
+    if dataset == 'MNIST':
+        lr_decay_epochs = [20, 40, 60] 
+    elif dataset == 'CIFAR10':
+        lr_decay_epochs = [200, 400, 500] # Tbh not really sure what to put here (qualified guess)
+
 
     save_dir = "./saved_models"  # Directory to save the trained model
 
@@ -54,7 +65,7 @@ def main():
 
     # Set mode for Weights and Biases
     mode_for_wandb = args.wandb
-    run_name = f"ddpm_{dataset}_T_{T}_bs_{batch_size}_Nscheduler_{noise_scheduler}"
+    run_name = f"{dataset}_bs_{batch_size}_Nscheduler_{noise_scheduler}_heads_{heads}"
 
     # Initialize Weights and Biases
     wandb.init(project='ddpm', entity='dl_ddpm', mode=mode_for_wandb, name=run_name)
@@ -80,13 +91,21 @@ def main():
                  heads=heads).to(device)
     
     optimizer = optim.Adam(model.parameters(), lr=lr)
+    
+    if lr_scheduler == "warmup_linear":
+        scheduler = WarmUpPiecewiseConstantSchedule(optimizer=optimizer, steps_per_epoch=len(train_loader), base_lr=args.lr, 
+                                                    lr_decay_ratio=0.2, lr_decay_epochs=lr_decay_epochs, warmup_epochs=warm_up_epochs)
+    else:
+        scheduler = None
 
-    for name, param in time_embedding.named_parameters():
-        print(f"{name}: requires_grad={param.requires_grad}")
+
+
+    # for name, param in time_embedding.named_parameters():
+    #     print(f"{name}: requires_grad={param.requires_grad}")
 
     # Training loop
     for epoch in range(1, num_epochs + 1):
-        train_ddpm_epoch(model, diffusion, time_embedding, train_loader, epoch, device, optimizer)
+        train_ddpm_epoch(model, diffusion, time_embedding, train_loader, epoch, device, optimizer, scheduler)
 
         if epoch % 5 == 0:
             # Generate samples 
@@ -94,7 +113,7 @@ def main():
             wandb.log({"Generated Samples": [wandb.Image(sample, caption=f"Epoch {epoch}") for sample in samples]})
 
     if save_model:
-        final_save_path = f"{save_dir}/ddpm_{dataset}_{noise_scheduler}_final.pth"
+        final_save_path = f"{save_dir}/ddpm_{dataset}_{noise_scheduler}_heads_{heads}.pth"
         torch.save({
             'model_state_dict': model.state_dict(),
             "embedding_state_dict": time_embedding.state_dict(),
