@@ -8,3 +8,8 @@ js_sandbox.ipynb
 __pycache__/
 saved_models/
 wandb/
+
+
+# Jonathan HPC
+ddpm_venv/
+hpc_jobscript.sh
