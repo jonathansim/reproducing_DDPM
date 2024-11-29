@@ -54,7 +54,7 @@ def main():
 
     # Set mode for Weights and Biases
     mode_for_wandb = args.wandb
-    run_name = f"ddpm_{dataset}_T_{T}_bs_{batch_size}_lr_{lr}"
+    run_name = f"ddpm_{dataset}_T_{T}_bs_{batch_size}_Nscheduler_{noise_scheduler}"
 
     # Initialize Weights and Biases
     wandb.init(project='ddpm', entity='dl_ddpm', mode=mode_for_wandb, name=run_name)
