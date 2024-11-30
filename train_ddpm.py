@@ -56,7 +56,7 @@ def train_ddpm_epoch(model: object, diffusion: object, time_embedding: object, t
             lr_scheduler.step()
 
         # Log loss
-        wandb.log({"loss": loss.item()})
+        wandb.log({"loss": loss.item(), "epoch": epoch, "lr": optimizer.param_groups[0]['lr']})
 
         if epoch > 1: 
             wandb.log({"loss after 1st epoch": loss.item()})
