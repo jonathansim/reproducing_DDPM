@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import argparse
 import wandb 
+import random 
 
 # Import custom modules
 from model_unet_advanced import UNet, SinusoidalPositionEmbeddings
@@ -25,7 +26,7 @@ parser = argparse.ArgumentParser(description='Train (and sample from) DDPM frame
 
 ## Add arguments
 parser.add_argument('--T', type=int, default=1000, help='Total timesteps.')
-parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
+parser.add_argument('--batch_size', type=int, default=128, help='Batch size.')
 parser.add_argument('--num_epochs', type=int, default=5, help='Number of epochs.')
 parser.add_argument('--lr', type=float, default=2e-4, help='Learning rate.')
 parser.add_argument('--dataset', type=str, default='MNIST', help='Dataset to use (MNIST or CIFAR10).')
@@ -34,10 +35,22 @@ parser.add_argument('--wandb', default="online", type=str, choices=["online", "d
 parser.add_argument('--heads', type=int, default=4, help='Number of heads for attention mechanism.')
 parser.add_argument('--noise_scheduler', type=str, default='cosine', choices=["linear", "cosine"], help='Noise scheduler type.')
 parser.add_argument('--lr_scheduler', type=str, default='none', choices=["none", "warmup_linear"], help='Learning rate scheduler type.')
+parser.add_argument('--seed', default=1, type=int, help="seed for reproducibility")
+
+
+def set_training_seed(seed):
+    # Function to set the different seeds 
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
 def main():
     # Parse arguments
     args = parser.parse_args()
+
+    # Set seed for reproducibility
+    set_training_seed(args.seed)
 
     # Unpack arguments
     T = args.T
@@ -65,7 +78,7 @@ def main():
 
     # Set mode for Weights and Biases
     mode_for_wandb = args.wandb
-    run_name = f"{dataset}_bs_{batch_size}_Nscheduler_{noise_scheduler}_heads_{heads}"
+    run_name = f"{dataset}_bs_{batch_size}_Nscheduler_{noise_scheduler}_heads_{heads}_LRs_{lr_scheduler}_seed{args.seed}"
 
     # Initialize Weights and Biases
     wandb.init(project='ddpm', entity='dl_ddpm', mode=mode_for_wandb, name=run_name)
@@ -113,7 +126,7 @@ def main():
             wandb.log({"Generated Samples": [wandb.Image(sample, caption=f"Epoch {epoch}") for sample in samples]})
 
     if save_model:
-        final_save_path = f"{save_dir}/ddpm_{dataset}_{noise_scheduler}_heads_{heads}.pth"
+        final_save_path = f"{save_dir}/ddpm_{dataset}_{noise_scheduler}_heads_{heads}_LRs_{lr_scheduler}_seed{args.seed}.pth"
         torch.save({
             'model_state_dict': model.state_dict(),
             "embedding_state_dict": time_embedding.state_dict(),
