@@ -20,6 +20,7 @@ from train_ddpm import train_ddpm_epoch
 from sample_ddpm import sample_ddpm
 from dataloader import get_dataloader
 from custom_lr_scheduler import WarmUpPiecewiseConstantSchedule
+from fid import full_fid, get_inception_model, get_real_image_activations, calculate_fid_generated_samples
 
 ## Argument parser
 parser = argparse.ArgumentParser(description='Train (and sample from) DDPM framework.')
@@ -36,7 +37,7 @@ parser.add_argument('--heads', type=int, default=4, help='Number of heads for at
 parser.add_argument('--noise_scheduler', type=str, default='cosine', choices=["linear", "cosine"], help='Noise scheduler type.')
 parser.add_argument('--lr_scheduler', type=str, default='none', choices=["none", "warmup_linear"], help='Learning rate scheduler type.')
 parser.add_argument('--seed', default=1, type=int, help="seed for reproducibility")
-
+parser.add_argument('--fid', default=True, type=bool, help="Calculate FID for 10000 images after training")
 
 def set_training_seed(seed):
     # Function to set the different seeds 
@@ -62,6 +63,8 @@ def main():
     heads = args.heads
     noise_scheduler = args.noise_scheduler
     lr_scheduler = args.lr_scheduler
+    calculate_fid = args.fid
+    calculate_fid_25 = True
 
     # Scheduler parameters
     warm_up_epochs = 2
@@ -78,7 +81,7 @@ def main():
 
     # Set mode for Weights and Biases
     mode_for_wandb = args.wandb
-    run_name = f"{dataset}_bs_{batch_size}_Nscheduler_{noise_scheduler}_heads_{heads}_LRs_{lr_scheduler}_seed{args.seed}"
+    run_name = f"{dataset}_bs_{batch_size}_Nscheduler_{noise_scheduler}_heads_{heads}_LRs_{lr_scheduler}_seed_{args.seed}"
 
     # Initialize Weights and Biases
     wandb.init(project='ddpm', entity='dl_ddpm', mode=mode_for_wandb, name=run_name)
@@ -117,6 +120,9 @@ def main():
     #     print(f"{name}: requires_grad={param.requires_grad}")
 
     # Training loop
+    inception_model = get_inception_model()
+    real_activations = get_real_image_activations(inception_classifier=inception_model, data=dataset, num_images=2500)
+    fid_epochs = []
     for epoch in range(1, num_epochs + 1):
         train_ddpm_epoch(model, diffusion, time_embedding, train_loader, epoch, device, optimizer, scheduler)
 
@@ -125,6 +131,14 @@ def main():
             samples = sample_ddpm(model, diffusion, time_embedding, device, num_samples=2, dataset=dataset) 
             wandb.log({"Generated Samples": [wandb.Image(sample, caption=f"Epoch {epoch}") for sample in samples]})
 
+        if calculate_fid_25:
+            if epoch == 1:
+                samples = sample_ddpm(model, diffusion, time_embedding, device, num_samples=2500, dataset=dataset)
+                fid_epochs.append(calculate_fid_generated_samples(generated_samples=samples, real_image_activations=real_activations, inception_classifier=inception_model, num_images = 2500, device = device))
+            if epoch % 25 == 0:
+                samples = sample_ddpm(model, diffusion, time_embedding, device, num_samples=2500, dataset=dataset)
+                fid_epochs.append(calculate_fid_generated_samples(generated_samples=samples, real_image_activations=real_activations, inception_classifier=inception_model, num_images = 2500, device=device))
+    print("FID_epochs: ", fid_epochs)
     if save_model:
         final_save_path = f"{save_dir}/ddpm_{dataset}_{noise_scheduler}_heads_{heads}_LRs_{lr_scheduler}_seed{args.seed}.pth"
         torch.save({
@@ -134,8 +148,17 @@ def main():
 
         print(f"Model and embedding saved at: {final_save_path}")
 
-    # Finish Weights and Biases run
-    wandb.finish()
+    if calculate_fid:
+        # Calculate FID
+        samples = sample_ddpm(model, diffusion, time_embedding, device, num_samples=10000, dataset=dataset)
+        print("Samples generated successfully!")
+        print("Shape samples: ", np.shape(samples))
+
+        fid = full_fid(samples, data = dataset, num_images = 10000)
+        #fid = full_fid_mnist_base()
+        print("Fid: ", fid)    
+        # Finish Weights and Biases run
+        wandb.finish()
 
 
 if __name__ == "__main__":
