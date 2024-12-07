@@ -38,6 +38,7 @@ parser.add_argument('--noise_scheduler', type=str, default='cosine', choices=["l
 parser.add_argument('--lr_scheduler', type=str, default='none', choices=["none", "warmup_linear"], help='Learning rate scheduler type.')
 parser.add_argument('--seed', default=1, type=int, help="seed for reproducibility")
 parser.add_argument('--fid', default=True, type=bool, help="Calculate FID for 10000 images after training")
+parser.add_argument('--calculate_fid_25', default=False, type=bool, help="Calculate FID for 2500 images after every 25th epoch")
 
 def set_training_seed(seed):
     # Function to set the different seeds 
@@ -64,7 +65,7 @@ def main():
     noise_scheduler = args.noise_scheduler
     lr_scheduler = args.lr_scheduler
     calculate_fid = args.fid
-    calculate_fid_25 = True
+    calculate_fid_25 = args.calculate_fid_25
 
     # Scheduler parameters
     warm_up_epochs = 2
