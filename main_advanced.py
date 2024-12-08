@@ -150,8 +150,7 @@ def main():
                                                                   num_images = 2500, 
                                                                   device=device))
                 wandb.log({"FID": fid_epochs[-1]})
-    print("FID_epochs: ", fid_epochs)
-
+    
     if save_model:
         final_save_path = f"{save_dir}/ddpm_{dataset}_{noise_scheduler}_heads_{heads}_LRs_{lr_scheduler}_seed{args.seed}.pth"
         torch.save({
