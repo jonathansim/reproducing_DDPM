@@ -1,26 +1,10 @@
 import numpy as np
-import tensorflow as tf
 from scipy.linalg import fractional_matrix_power
 import torchvision.models as models
 import torch
-import tensorflow_hub as tfhub
 from dataloader import get_dataloader_evaluation
+import torchvision
 
-'''
-EXAMPLE MNIST:
-# Get MNIST prediction model
-MNIST_MODULE = "https://tfhub.dev/tensorflow/tfgan/eval/mnist/logits/1"
-mnist_classifier_fn = tfhub.load(MNIST_MODULE)
-
-dataloader = get_dataloader_evaluation(dataset = "MNIST", batch_size = 128)
-mnist_real = get_mnist_real(dataloader, num_images=10000)
-real_activations = compute_mnist_activations(mnist_real, mnist_classifier_fn)
-generated_activations = compute_mnist_activations(samples, mnist_classifier_fn)
-
-# Calculate FID
-calculate_fid(real_activations, generated_activations)
-
-'''
 
 def calculate_fid(feat1, feat2):
     '''
@@ -32,9 +16,11 @@ def calculate_fid(feat1, feat2):
     # calculate mean and covariance of features
     mu1, sigma1 = np.mean(feat1, axis=0), np.cov(feat1, rowvar=False) 
     mu2, sigma2 = np.mean(feat2, axis=0), np.cov(feat2, rowvar=False)
+    print("Mean1: ", np.shape(mu1))
+    print("Mean2: ", np.shape(mu2))
     # sum squared difference between means
     diff = np.sum((mu1 - mu2)**2)
- 
+    print("diff: ", diff)
     # calculate "geometric mean" of covariance matrices
     covmean = fractional_matrix_power(sigma1.dot(sigma2), 0.5)
     # check for imaginary numbers
@@ -43,20 +29,6 @@ def calculate_fid(feat1, feat2):
 
     fid = diff + np.trace(sigma1 + sigma2 - 2 * covmean)
     return fid
-
-
-def compute_activations(tensors, num_batches, classifier_fn):
-    """
-    Given a tensor of of shape (batch_size, height, width, channels), computes
-    the activiations given by classifier_fn.
-    """
-    tensors_list = tf.split(tensors, num_or_size_splits=num_batches)
-    stack = tf.stack(tensors_list)
-    activation = tf.nest.map_structure(
-        tf.stop_gradient,
-        tf.map_fn(classifier_fn, stack, parallel_iterations=1, swap_memory=True),
-    )
-    return tf.concat(tf.unstack(activation), 0)
 
 
 def get_mnist_real(dataloader, num_images=None):
@@ -86,56 +58,9 @@ def get_mnist_real(dataloader, num_images=None):
     return real_images
 
 
-def compute_mnist_activations(samples, classifier_fn):
+def compute_activations(samples, model, batched = False, batch_size = 100):
     """
-    Compute activations for generated samples.
-    Args:
-        samples: Generated samples or real images (Tensor).
-        classifier_fn: Classifier function to extract features.
-    Returns:
-        activations: Feature activations for generated images.
-    """
-    samples = torch.permute(samples, (0, 2, 3, 1))  # Change to (num_samples, height, width, channels)
-    samples = tf.convert_to_tensor(samples.cpu().numpy())  # Convert to TensorFlow tensor
-
-    # Compute activations
-    activations = compute_activations(samples, num_batches=1, classifier_fn=classifier_fn)
-
-    return activations.numpy()
-
-def full_fid_mnist(generated_samples, num_images = 10000):
-    """
-    Computes the Fréchet Inception Distance (FID) score between generated samples
-    and real MNIST images using a pre-trained MNIST classifier instead of Inceptionv3.
-
-    Args:
-        generated_samples (torch.Tensor): Tensor containing the generated samples 
-            of shape (num_samples, channels, height, width).
-        num_images (int, optional): Number of real MNIST images to use for FID computation. Should be the same as num_samples. 
-            Defaults to 10,000.
-
-    Returns:
-        float: FID score between the generated and real MNIST images.
-    """
-
-    # Get MNIST prediction model
-    MNIST_MODULE = "https://tfhub.dev/tensorflow/tfgan/eval/mnist/logits/1"
-    mnist_classifier_fn = tfhub.load(MNIST_MODULE)
-
-    dataloader = get_dataloader_evaluation(dataset = "MNIST", batch_size = 128)
-    mnist_real = get_mnist_real(dataloader, num_images=num_images)
-    real_activations = compute_mnist_activations(mnist_real, mnist_classifier_fn)
-    generated_activations = compute_mnist_activations(generated_samples, mnist_classifier_fn)
-
-    # Calculate FID
-    fid = calculate_fid(real_activations, generated_activations)
-
-    return fid
-
-
-def compute_cifar_activations(samples, model):
-    """
-    Compute activations for samples using the CIFAR-10 feature extractor.
+    Compute activations from samples based on model.
     Args:
         samples: Tensor of shape (num_samples, channels, height, width)
         model: Pre-trained model to extract features
@@ -144,26 +69,34 @@ def compute_cifar_activations(samples, model):
     """
     model.eval()
     samples = samples.to(next(model.parameters()).device)  # Move to the same device as the model
-    with torch.no_grad():
-        activations = model(samples)
-    return activations.cpu().numpy()
+
+    if batched:
+        activations = []
+        with torch.no_grad():
+            for i in range(0, samples.size(0), batch_size):
+                batch = samples[i:i+batch_size]
+                batch_activations = model(batch).cpu().numpy()
+                activations.append(batch_activations)
+        return np.concatenate(activations, axis=0)
+    else:
+        with torch.no_grad():
+            activations = model(samples)
+        return activations.cpu().numpy()
 
 
-def get_cifar_real_in_batches(dataloader, num_images=None):
+def get_images_in_batches(dataloader, num_images=None):
     """
-    Fetch CIFAR-10 images in smaller batches without concatenating them.
+    Fetch e.g. CIFAR-10 images in smaller batches without concatenating them.
     Args:
-        dataloader: PyTorch DataLoader providing the CIFAR-10 dataset.
+        dataloader: PyTorch DataLoader providing the dataset.
         num_images: Number of images to fetch.
     Yields:
-        Batches of real images from the CIFAR-10 dataset.
+        Batches of real images from the dataset.
     """
     count = 0
     for images, _ in dataloader:
         count += len(images)
         if num_images and count >= num_images:
-            img_need = num_images - count
-            images = images[:img_need]
             yield images
             break
 
@@ -175,12 +108,13 @@ def get_cifar_real_in_batches(dataloader, num_images=None):
         torch.cuda.empty_cache()
 
 
-def full_fid_cifar(generated_samples, num_images = 10000):
+def full_fid(generated_samples, data, num_images = 10000):
     """
     Computes the Fréchet Inception Distance (FID) between generated images and real CIFAR-10 images.
     Args:
         generated_samples (torch.Tensor): Tensor of generated samples 
             with shape (num_samples, channels, height, width).
+        data (str): MNIST or CIFAR10
         num_images (int, optional): Number of real CIFAR-10 images to use for FID computation. 
             Defaults to 10,000.
     Returns:
@@ -189,19 +123,72 @@ def full_fid_cifar(generated_samples, num_images = 10000):
 
     # Load pre-trained InceptionV3
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    cifar_classifier = models.inception_v3(weights='DEFAULT', transform_input=False)
-    cifar_classifier.fc = torch.nn.Identity()  # remove classification layer to extract features
-    cifar_classifier = cifar_classifier.to(device)
-    # Get CIFAR-10 train samples
-    dataloader = get_dataloader_evaluation(dataset = "CIFAR10", batch_size = 100)
+    inception_classifier = models.inception_v3(weights='DEFAULT', transform_input=False)
+    inception_classifier.fc = torch.nn.Identity()  # remove classification layer to extract features
+    inception_classifier = inception_classifier.to(device)
+
+    # Get train samples
+    dataloader = get_dataloader_evaluation(dataset = data, batch_size = 100)
+    print("DATA: ", data)
+    # Get activations for real images
     real_image_activations = []
-
-    for batch in get_cifar_real_in_batches(dataloader, num_images=num_images):
-        activation = compute_cifar_activations(batch, cifar_classifier)
+    for batch in get_images_in_batches(dataloader, num_images=num_images):
+        activation = compute_activations(batch, inception_classifier)
         real_image_activations.extend(activation)
-    
-    generated_image_activations = compute_cifar_activations(generated_samples, cifar_classifier)
+    real_image_activations = real_image_activations[:num_images]
 
+    # Get activations of generated images
+    min_val = generated_samples.min()
+    max_val = generated_samples.max()
+    resized_samples = (generated_samples - min_val) / (max_val - min_val) # rescale pixel values to [0,1]
+    print("Rescale generated images to [0,1]")
+    resized_samples = resized_samples.repeat(1, 3, 1, 1)
+    resized_samples = torchvision.transforms.functional.resize(resized_samples, size = (299, 299)) # resize for inception
+    resized_samples = torchvision.transforms.functional.normalize(resized_samples, 
+        mean=torch.tensor([0.485, 0.456, 0.406]).view(1, -1, 1, 1).to(device), 
+        std=torch.tensor([0.229, 0.224, 0.225]).view(1, -1, 1, 1).to(device)
+    )
+    generated_image_activations = compute_activations(resized_samples, inception_classifier, batched = True)
+    print(np.shape(generated_image_activations))
+    print(np.shape(real_image_activations))
     fid = calculate_fid(real_image_activations, generated_image_activations)
 
+    return fid
+
+
+def get_inception_model():
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    inception_classifier = models.inception_v3(weights='DEFAULT', transform_input=False)
+    inception_classifier.fc = torch.nn.Identity()  # remove classification layer to extract features
+    inception_classifier = inception_classifier.to(device)
+    return inception_classifier
+
+def get_real_image_activations(inception_classifier, data, num_images = 10000):
+    # Get train samples
+    dataloader = get_dataloader_evaluation(dataset = data, batch_size = 100)
+    print("DATA: ", data)
+    # Get activations for real images
+    real_image_activations = []
+    for batch in get_images_in_batches(dataloader, num_images=num_images):
+        activation = compute_activations(batch, inception_classifier)
+        real_image_activations.extend(activation)
+    real_image_activations = real_image_activations[:num_images]
+    return real_image_activations
+
+def calculate_fid_generated_samples(generated_samples, real_image_activations, inception_classifier,device, num_images = 10000):
+        # Get activations of generated images
+    min_val = generated_samples.min()
+    max_val = generated_samples.max()
+    resized_samples = (generated_samples - min_val) / (max_val - min_val) # rescale pixel values to [0,1]
+    print("Rescale generated images to [0,1]")
+    resized_samples = resized_samples.repeat(1, 3, 1, 1)
+    resized_samples = torchvision.transforms.functional.resize(resized_samples, size = (299, 299)) # resize for inception
+    resized_samples = torchvision.transforms.functional.normalize(resized_samples, 
+        mean=torch.tensor([0.485, 0.456, 0.406]).view(1, -1, 1, 1).to(device), 
+        std=torch.tensor([0.229, 0.224, 0.225]).view(1, -1, 1, 1).to(device)
+    )
+    generated_image_activations = compute_activations(resized_samples, inception_classifier, batched = True)
+    print(np.shape(generated_image_activations))
+    print(np.shape(real_image_activations))
+    fid = calculate_fid(real_image_activations, generated_image_activations)
     return fid
