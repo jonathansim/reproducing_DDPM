@@ -44,11 +44,13 @@ def get_dataloader(dataset = "MNIST", batch_size = 128):
 
 def get_dataloader_evaluation(dataset = "MNIST", batch_size = 128):
     transforms_mnist = torchvision.transforms.Compose(
-            [
-                torchvision.transforms.ToTensor(),
-                # TODO: Do we need to make any transforms for the model used to evaluate MNIST
-            ]
-        )
+        [
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Lambda(lambda x: x.repeat(3, 1, 1)),
+            torchvision.transforms.Resize((299, 299)),  # Resize for InceptionV3
+            torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),  #normalize for InceptionV3
+        ]
+    )
 
     transforms_cifar10 = torchvision.transforms.Compose(
           [
