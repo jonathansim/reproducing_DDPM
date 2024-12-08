@@ -135,11 +135,22 @@ def main():
         if calculate_fid_25:
             if epoch == 1:
                 samples = sample_ddpm(model, diffusion, time_embedding, device, num_samples=2500, dataset=dataset)
-                fid_epochs.append(calculate_fid_generated_samples(generated_samples=samples, real_image_activations=real_activations, inception_classifier=inception_model, num_images = 2500, device = device))
+                fid_epochs.append(calculate_fid_generated_samples(generated_samples=samples, 
+                                                                  real_image_activations=real_activations, 
+                                                                  inception_classifier=inception_model, 
+                                                                  num_images = 2500, 
+                                                                  device = device))
+                wandb.log({"FID": fid_epochs[-1]})
             if epoch % 25 == 0:
                 samples = sample_ddpm(model, diffusion, time_embedding, device, num_samples=2500, dataset=dataset)
-                fid_epochs.append(calculate_fid_generated_samples(generated_samples=samples, real_image_activations=real_activations, inception_classifier=inception_model, num_images = 2500, device=device))
+                fid_epochs.append(calculate_fid_generated_samples(generated_samples=samples, 
+                                                                  real_image_activations=real_activations, 
+                                                                  inception_classifier=inception_model, 
+                                                                  num_images = 2500, 
+                                                                  device=device))
+                wandb.log({"FID": fid_epochs[-1]})
     print("FID_epochs: ", fid_epochs)
+
     if save_model:
         final_save_path = f"{save_dir}/ddpm_{dataset}_{noise_scheduler}_heads_{heads}_LRs_{lr_scheduler}_seed{args.seed}.pth"
         torch.save({
@@ -156,6 +167,7 @@ def main():
         print("Shape samples: ", np.shape(samples))
 
         fid = full_fid(samples, data = dataset, num_images = 10000)
+        wandb.log({"full_FID": fid})
         #fid = full_fid_mnist_base()
         print("Fid: ", fid)    
         # Finish Weights and Biases run
