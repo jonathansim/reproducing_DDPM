@@ -121,9 +121,10 @@ def main():
     #     print(f"{name}: requires_grad={param.requires_grad}")
 
     # Training loop
-    inception_model = get_inception_model()
-    real_activations = get_real_image_activations(inception_classifier=inception_model, data=dataset, num_images=2500)
-    fid_epochs = []
+    if calculate_fid_25:
+        inception_model = get_inception_model()
+        real_activations = get_real_image_activations(inception_classifier=inception_model, data=dataset, num_images=2500)
+        fid_epochs = []
     for epoch in range(1, num_epochs + 1):
         train_ddpm_epoch(model, diffusion, time_embedding, train_loader, epoch, device, optimizer, scheduler)
 
