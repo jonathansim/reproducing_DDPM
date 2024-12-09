@@ -38,7 +38,8 @@ parser.add_argument('--noise_scheduler', type=str, default='cosine', choices=["l
 parser.add_argument('--lr_scheduler', type=str, default='none', choices=["none", "warmup_linear"], help='Learning rate scheduler type.')
 parser.add_argument('--seed', default=1, type=int, help="seed for reproducibility")
 parser.add_argument('--fid', default=True, type=bool, help="Calculate FID for 10000 images after training")
-parser.add_argument('--calculate_fid_25', default=False, type=bool, help="Calculate FID for 2500 images after every 25th epoch")
+parser.add_argument('--calculate_fid_25', default=True, type=bool, help="Calculate FID for 2500 images after every 25th epoch")
+parser.add_argument('--fid_epoch_modulo', default=50, type=int, help="Which epochs to run fid")
 
 def set_training_seed(seed):
     # Function to set the different seeds 
@@ -48,6 +49,7 @@ def set_training_seed(seed):
     random.seed(seed)
 
 def main():
+    torch.cuda.empty_cache()
     # Parse arguments
     args = parser.parse_args()
 
@@ -66,6 +68,8 @@ def main():
     lr_scheduler = args.lr_scheduler
     calculate_fid = args.fid
     calculate_fid_25 = args.calculate_fid_25
+    fid_epoch_modulo = args.fid_epoch_modulo
+
 
     # Scheduler parameters
     warm_up_epochs = 2
@@ -124,7 +128,7 @@ def main():
     if calculate_fid_25:
         inception_model = get_inception_model()
         real_activations = get_real_image_activations(inception_classifier=inception_model, data=dataset, num_images=2500)
-        fid_epochs = []
+    fid_epochs = []
     for epoch in range(1, num_epochs + 1):
         train_ddpm_epoch(model, diffusion, time_embedding, train_loader, epoch, device, optimizer, scheduler)
 
@@ -138,19 +142,21 @@ def main():
                 samples = sample_ddpm(model, diffusion, time_embedding, device, num_samples=2500, dataset=dataset)
                 fid_epochs.append(calculate_fid_generated_samples(generated_samples=samples, 
                                                                   real_image_activations=real_activations, 
-                                                                  inception_classifier=inception_model, 
+                                                                  inception_classifier=inception_model,
+                                                                  data = dataset,
                                                                   num_images = 2500, 
                                                                   device = device))
                 wandb.log({"FID": fid_epochs[-1]})
-            if epoch % 25 == 0:
+            if epoch % fid_epoch_modulo == 0:
                 samples = sample_ddpm(model, diffusion, time_embedding, device, num_samples=2500, dataset=dataset)
                 fid_epochs.append(calculate_fid_generated_samples(generated_samples=samples, 
                                                                   real_image_activations=real_activations, 
-                                                                  inception_classifier=inception_model, 
+                                                                  inception_classifier=inception_model,
+                                                                  data = dataset, 
                                                                   num_images = 2500, 
-                                                                  device=device))
+                                                                  device = device))
                 wandb.log({"FID": fid_epochs[-1]})
-    
+    print("FID_epochs: ", fid_epochs)
     if save_model:
         final_save_path = f"{save_dir}/ddpm_{dataset}_{noise_scheduler}_heads_{heads}_LRs_{lr_scheduler}_seed{args.seed}.pth"
         torch.save({
@@ -168,7 +174,6 @@ def main():
 
         fid = full_fid(samples, data = dataset, num_images = 10000)
         wandb.log({"full_FID": fid})
-        #fid = full_fid_mnist_base()
         print("Fid: ", fid)    
         # Finish Weights and Biases run
         wandb.finish()
