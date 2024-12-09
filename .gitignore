@@ -13,3 +13,4 @@ wandb/
 # Jonathan HPC
 ddpm_venv/
 hpc_jobscript.sh
+run_fid_js.py 
