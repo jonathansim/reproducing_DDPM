@@ -31,33 +31,6 @@ def calculate_fid(feat1, feat2):
     return fid
 
 
-def get_mnist_real(dataloader, num_images=None):
-    """
-    Fetch a specified number of real images from the dataloader.
-    
-    Args:
-        dataloader: PyTorch DataLoader providing the MNIST dataset.
-        num_images: Number of images to fetch. If None, fetch all available images.
-        
-    Returns:
-        real_images: A tensor containing the requested number of real images.
-    """
-    real_images = []
-
-    for images, _ in dataloader:
-        real_images.append(images)
-        
-        if num_images is not None and len(torch.cat(real_images, dim=0)) >= num_images:
-            break
-    
-    real_images = torch.cat(real_images, dim=0)  # Shape: (num_real_images, channels, height, width)
-    
-    if num_images is not None:
-        real_images = real_images[:num_images]
-    
-    return real_images
-
-
 def compute_activations(samples, model, batched = False, batch_size = 100):
     """
     Compute activations from samples based on model.
