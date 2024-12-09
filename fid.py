@@ -142,7 +142,8 @@ def full_fid(generated_samples, data, num_images = 10000):
     max_val = generated_samples.max()
     resized_samples = (generated_samples - min_val) / (max_val - min_val) # rescale pixel values to [0,1]
     print("Rescale generated images to [0,1]")
-    resized_samples = resized_samples.repeat(1, 3, 1, 1)
+    if data == "MNIST":
+        resized_samples = resized_samples.repeat(1, 3, 1, 1)
     resized_samples = torchvision.transforms.functional.resize(resized_samples, size = (299, 299)) # resize for inception
     resized_samples = torchvision.transforms.functional.normalize(resized_samples, 
         mean=torch.tensor([0.485, 0.456, 0.406]).view(1, -1, 1, 1).to(device), 
@@ -175,13 +176,14 @@ def get_real_image_activations(inception_classifier, data, num_images = 10000):
     real_image_activations = real_image_activations[:num_images]
     return real_image_activations
 
-def calculate_fid_generated_samples(generated_samples, real_image_activations, inception_classifier,device, num_images = 10000):
+def calculate_fid_generated_samples(generated_samples, real_image_activations, inception_classifier, device, data, num_images = 10000):
         # Get activations of generated images
     min_val = generated_samples.min()
     max_val = generated_samples.max()
     resized_samples = (generated_samples - min_val) / (max_val - min_val) # rescale pixel values to [0,1]
     print("Rescale generated images to [0,1]")
-    resized_samples = resized_samples.repeat(1, 3, 1, 1)
+    if data == "MNIST":
+        resized_samples = resized_samples.repeat(1, 3, 1, 1)
     resized_samples = torchvision.transforms.functional.resize(resized_samples, size = (299, 299)) # resize for inception
     resized_samples = torchvision.transforms.functional.normalize(resized_samples, 
         mean=torch.tensor([0.485, 0.456, 0.406]).view(1, -1, 1, 1).to(device), 
