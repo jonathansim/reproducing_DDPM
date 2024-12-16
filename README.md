@@ -4,5 +4,6 @@ The results will be reproduced on MNIST and preferably on CIFAR as well.
 
 The project is conducted as part of the course in Deep Learning at the Technical University of Denmark. 
 
-![Project Logo](images/cifar_samples_225.png)
+![MNIST samples](images/mnist_visuals.png)
+![CIFAR10 samples](images/cifar_visuals.png)
 
