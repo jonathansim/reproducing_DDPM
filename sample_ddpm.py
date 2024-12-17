@@ -162,7 +162,7 @@ if __name__ == "__main__":
     diffusion = Diffusion(T=1000, beta_min=10e-5, beta_max=0.02, schedule='cosine', device=device)
     
     # Step 3: Load the trained model
-    # model_path = "ddpm_CIFAR10_fina_advanced.pth"
+    #model_path = "ddpm_CIFAR10_linear_heads_1_LRs_none_seed7.pth"
     model_path = "ddpm_MNIST_cosine_final.pth"
     saved = torch.load(model_path, map_location=device)
 
@@ -177,7 +177,8 @@ if __name__ == "__main__":
     print(f"Trainable parameters: {trainable_params}")
 
     # Step 4: Generate samples
-    samples = sample_ddpm(unet, diffusion, time_embedding, device, num_samples=25, dataset='MNIST')
+    samples = sample_ddpm(unet, diffusion, time_embedding, device, num_samples=28, dataset='MNIST')
     print("Samples generated successfully!")
-    visualize_samples_mnist(samples)
+    #visualize_samples_cifar10(samples, num_cols=8)
+    visualize_samples_mnist(samples, num_cols=7)
     
