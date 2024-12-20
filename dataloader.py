@@ -7,8 +7,6 @@ def get_dataloader(dataset = "MNIST", batch_size = 128):
     transforms = torchvision.transforms.Compose(
             [
                 torchvision.transforms.ToTensor(),
-                # No flips in MNIST as it disturbes the interpretation of numbers?
-                #torchvision.transforms.Resize((32, 32), interpolation=torchvision.transforms.InterpolationMode.BICUBIC), # TODO: Resize to 32 x 32 for unet implementation?
                 torchvision.transforms.Normalize((0.5,), (0.5,))  # Correpsonds to scaling between [-1, 1] --> (x - 0.5)/0.5
             ]
         )
@@ -17,7 +15,6 @@ def get_dataloader(dataset = "MNIST", batch_size = 128):
             [
                 torchvision.transforms.ToTensor(),
                 torchvision.transforms.RandomHorizontalFlip(),
-                #torchvision.transforms.Resize((32, 32), interpolation=torchvision.transforms.InterpolationMode.BICUBIC), # TODO: Match paper or resize to 28 x 28 for unet implementation
                 torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Scaling between [-1, 1]
             ]
         )
@@ -25,7 +22,6 @@ def get_dataloader(dataset = "MNIST", batch_size = 128):
     transforms_cifar10_test = torchvision.transforms.Compose(
             [
                 torchvision.transforms.ToTensor(),
-                #torchvision.transforms.Resize((32, 32), interpolation=torchvision.transforms.InterpolationMode.BICUBIC), # TODO: Match paper or resize to 28 x 28 for unet implementation
                 torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Scaling between [-1, 1]
             ]
         )

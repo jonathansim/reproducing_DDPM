@@ -83,15 +83,15 @@ def get_images_in_batches(dataloader, num_images=None):
 
 def full_fid(generated_samples, data, num_images = 10000):
     """
-    Computes the Fréchet Inception Distance (FID) between generated images and real CIFAR-10 images.
+    Computes the Fréchet Inception Distance (FID) between generated images and real images.
     Args:
         generated_samples (torch.Tensor): Tensor of generated samples 
             with shape (num_samples, channels, height, width).
         data (str): MNIST or CIFAR10
-        num_images (int, optional): Number of real CIFAR-10 images to use for FID computation. 
+        num_images (int, optional): Number of real images to use for FID computation. 
             Defaults to 10,000.
     Returns:
-        float: FID score between the generated and real CIFAR-10 images.
+        float: FID score between the generated and real images.
     """
 
     # Load pre-trained InceptionV3
@@ -114,7 +114,6 @@ def full_fid(generated_samples, data, num_images = 10000):
     min_val = generated_samples.min()
     max_val = generated_samples.max()
     resized_samples = (generated_samples - min_val) / (max_val - min_val) # rescale pixel values to [0,1]
-    print("Rescale generated images to [0,1]")
     if data == "MNIST":
         resized_samples = resized_samples.repeat(1, 3, 1, 1)
     resized_samples = torchvision.transforms.functional.resize(resized_samples, size = (299, 299)) # resize for inception
@@ -150,11 +149,10 @@ def get_real_image_activations(inception_classifier, data, num_images = 10000):
     return real_image_activations
 
 def calculate_fid_generated_samples(generated_samples, real_image_activations, inception_classifier, device, data, num_images = 10000):
-        # Get activations of generated images
+    # Get activations of generated images
     min_val = generated_samples.min()
     max_val = generated_samples.max()
     resized_samples = (generated_samples - min_val) / (max_val - min_val) # rescale pixel values to [0,1]
-    print("Rescale generated images to [0,1]")
     if data == "MNIST":
         resized_samples = resized_samples.repeat(1, 3, 1, 1)
     resized_samples = torchvision.transforms.functional.resize(resized_samples, size = (299, 299)) # resize for inception
